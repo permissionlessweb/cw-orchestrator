@@ -1,5 +1,6 @@
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, MigrateInfo, Response,
+    StdResult,
 };
 use cw2::set_contract_version;
 
@@ -53,7 +54,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(feature = "export", entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(
+    _deps: DepsMut,
+    _env: Env,
+    _msg: MigrateMsg,
+    _info: MigrateInfo,
+) -> Result<Response, ContractError> {
     Ok(Response::default().add_attribute("action", "migrate"))
 }
 // ANCHOR_END: interface_entry

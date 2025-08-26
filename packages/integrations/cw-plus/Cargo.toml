@@ -17,18 +17,18 @@ cw-utils        = { workspace = true }
 
 
 cw-controllers     = { version = "3.0.0" }
-cw1                = { package = "cw1", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw1-subkeys        = { package = "cw1-subkeys", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw1-whitelist      = { package = "cw1-whitelist", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw20               = { package = "cw20", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw20-base          = { package = "cw20-base", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw20-ics20         = {  git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw3                = { package = "cw3", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw3-fixed-multisig = { package = "cw3-fixed-multisig", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw3-flex-multisig  = { package = "cw3-flex-multisig", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw4                = { package = "cw4", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw4-group          = { package = "cw4-group", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
-cw4-stake          = { package = "cw4-stake", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3", features = ["library"] }
+cw1                = { package = "cw1", git = "https://github.com/permissionlessweb/cw-plus" }
+cw1-subkeys        = { package = "cw1-subkeys", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw1-whitelist      = { package = "cw1-whitelist", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw20               = { package = "cw20", git = "https://github.com/permissionlessweb/cw-plus" }
+cw20-base          = { package = "cw20-base", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw20-ics20         = { git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw3                = { package = "cw3", git = "https://github.com/permissionlessweb/cw-plus" }
+cw3-fixed-multisig = { package = "cw3-fixed-multisig", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw3-flex-multisig  = { package = "cw3-flex-multisig", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw4                = { package = "cw4", git = "https://github.com/permissionlessweb/cw-plus" }
+cw4-group          = { package = "cw4-group", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
+cw4-stake          = { package = "cw4-stake", git = "https://github.com/permissionlessweb/cw-plus", features = ["library"] }
 
 cw-orch-from-interface-derive = { version = "0.1.0", path = "../../macros/from-interface-derive" }
 

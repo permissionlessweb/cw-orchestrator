@@ -1,8 +1,8 @@
 use mock_contract::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, ThirdReturn};
 
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint256,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, MigrateInfo, Response,
+    StdError, StdResult, Uint256,
 };
 
 #[entry_point]
@@ -63,7 +63,12 @@ pub fn query(_deps: Deps, _env: Env, msg: QueryMsg<u64>) -> StdResult<Binary> {
 }
 
 #[entry_point]
-pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(
+    _deps: DepsMut,
+    _env: Env,
+    msg: MigrateMsg,
+    _info: MigrateInfo,
+) -> StdResult<Response> {
     if msg.t.eq("success") {
         Ok(Response::new())
     } else {

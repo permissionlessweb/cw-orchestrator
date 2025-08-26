@@ -145,8 +145,8 @@ mod contract {
             &self,
             deps: cosmwasm_std::DepsMut<cosmwasm_std::Empty>,
             env: cosmwasm_std::Env,
-            info: MigrateInfo,
             msg: Vec<u8>,
+            info: MigrateInfo,
             fork_state: ForkState<Empty, Empty>,
         ) -> StdResult<cosmwasm_std::Response> {
             let querier = MockQuerier::new(fork_state.clone());

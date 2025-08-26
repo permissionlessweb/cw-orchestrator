@@ -31,8 +31,8 @@ ibc-relayer-types.workspace = true
 
 #Used only for testing
 cosmwasm-std.workspace = true
-cw1                    = {  package = "cw1", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw1-whitelist          = {  git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
+cw1                    = {  package = "cw1", git = "https://github.com/permissionlessweb/cw-plus" }
+cw1-whitelist          = {  git = "https://github.com/permissionlessweb/cw-plus" }
 speculoos.workspace    = true
 
 [dev-dependencies]

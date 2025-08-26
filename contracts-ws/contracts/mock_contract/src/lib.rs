@@ -5,8 +5,8 @@ use std::fmt::Debug;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Uint128, Uint256,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, MigrateInfo, Response, StdError,
+    StdResult, Uint128, Uint256,
 };
 use cw_storage_plus::{Item, Map};
 use serde::Serialize;
@@ -165,7 +165,12 @@ pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(feature = "export", cosmwasm_std::entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(
+    _deps: DepsMut,
+    _env: Env,
+    msg: MigrateMsg,
+    _info: MigrateInfo,
+) -> StdResult<Response> {
     if msg.t.eq("success") {
         Ok(Response::new())
     } else {

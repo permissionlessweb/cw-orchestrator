@@ -10,8 +10,8 @@ edition = "2021"
 [workspace.dependencies]
 cosmwasm-std    = "3.0.1"
 cw-storage-plus = { version = "3.0.0" }
-cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
+cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
+cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
 
 anyhow = "1.0"
 log    = "0.4.14"

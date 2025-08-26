@@ -34,8 +34,8 @@ cw-utils         = { version = "3.0.0" }
 cw-multi-test = { package = "abstract-cw-multi-test", version = "3.0.0-rc", features = ["cosmwasm_3_0"], git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "bump/cw3/official-ibc-fork" }
 
 cosmos-sdk-proto = { version = "0.28.0",git = "https://github.com/permissionlessweb/cosmos-rust", default-features = false}
-cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
+cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
+cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
 
 neutron-test-tube = { package = "neutron-test-tube",version = "5.1.3", git = "https://github.com/permissionlessweb/neutron-test-tube" }
 osmosis-test-tube = { version = "25.0.0", git = "https://github.com/permissionlessweb/osmosis-test-tube" }

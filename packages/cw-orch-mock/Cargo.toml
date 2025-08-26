@@ -20,8 +20,8 @@ serde         = { workspace = true }
 sha2          = { workspace = true }
 
 [dev-dependencies]
-cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
-cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
+cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
+cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
 speculoos = { workspace = true }
 
 anyhow        = { workspace = true }
