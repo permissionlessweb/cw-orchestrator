@@ -1,4 +1,5 @@
 use cosmos_sdk_proto::traits::{Message, Name};
+use cosmwasm_std::StdResult;
 use cw_orch::{environment::QueryHandler, prelude::*};
 use cw_orch_interchain::prelude::*;
 use cw_orch_interchain_core::IbcPacketOutcome;
@@ -6,7 +7,7 @@ use cw_orch_starship::Starship;
 use ibc_proto::ibc::{applications::transfer::v1::MsgTransfer, core::client::v1::Height};
 use ibc_relayer_types::core::ics24_host::identifier::PortId;
 use prost_types::Any;
-fn main() -> cw_orch::anyhow::Result<()> {
+fn main() -> StdResult<()> {
     pretty_env_logger::init();
 
     let starship = Starship::new(None)?;

@@ -17,11 +17,12 @@ cw-orch-core   = { workspace = true }
 cw-orch-daemon = { workspace = true }
 
 tokio = { workspace = true }
-
+ibc-proto        = { workspace = true }
 async-recursion   = "1.1.1"
 base64            = "0.22.1"
 cosmrs            = { workspace = true }
-cosmwasm-schema   = "2.1.3"
+cosmwasm-schema   = "3.0.0"
+
 derive_builder    = "0.20.0"
 diff-struct       = "0.5.3"
 futures           = "0.3.30"

@@ -90,6 +90,7 @@ impl<S: StateInterface> WasmQuerier for OsmosisTestTubeWasmQuerier<S> {
             Some(Addr::unchecked(result.admin)),
             false,
             ibc_port,
+            None,
         );
         Ok(contract_info)
     }

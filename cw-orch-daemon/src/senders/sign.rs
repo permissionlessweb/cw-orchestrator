@@ -13,7 +13,7 @@ use cosmrs::{
     bank::MsgSend,
     proto::cosmos::authz::v1beta1::MsgExec,
     tendermint::chain::Id,
-    tx::{Body, Fee, Raw, SignDoc, SignerInfo},
+    tx::{Body, Fee, MessageExt, Raw, SignDoc, SignerInfo},
     AccountId, Any,
 };
 use cosmwasm_std::Addr;
@@ -100,7 +100,8 @@ impl<T: Signer + Sync> TxSender for T {
                     grantee: self.account_id().to_string(),
                     msgs,
                 }
-                .encode_to_vec(),
+                .to_bytes()
+                .map_err(|e| DaemonError::StdErr(e.to_string()))?,
             }]
         } else {
             msgs

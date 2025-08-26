@@ -1,3 +1,4 @@
+use cosmwasm_std::StdResult;
 use counter_contract::AsyncCounterQueryMsgFns;
 use counter_contract::CounterContract;
 
@@ -8,7 +9,7 @@ use cw_orch_daemon::DaemonAsync;
 ///
 /// TEST_MNEMONIC to be able to sign and broadcast a transaction on UNI testnet
 #[tokio::main]
-pub async fn main() -> anyhow::Result<()> {
+pub async fn main() -> StdResult<()> {
     // We start by loading environment variables from a .env file.
     // You can use a .env file to specify environment variables.
     // You have an overview of all supported environment variables here : https://orchestrator.abstract.money/contracts/env-variable.html

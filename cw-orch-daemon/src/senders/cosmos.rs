@@ -30,6 +30,7 @@ use cw_orch_core::{
     environment::{AccessConfig, ChainInfoOwned, ChainKind},
     CoreEnvVars, CwEnvError,
 };
+use prost::Message as _;
 use std::sync::Arc;
 use tonic::transport::Channel;
 

@@ -2,6 +2,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::coins;
 use cosmwasm_std::Addr;
+use cosmwasm_std::StdResult;
 use counter_contract::msg::MigrateMsg;
 use counter_contract::CounterContract;
 use counter_contract::CounterQueryMsgFns;
@@ -20,7 +21,7 @@ use cosmwasm_std::Empty;
 
 /// For those Who don't know, CAVERN PROTOCOL was a money market
 #[test]
-pub fn cavern_integration_test() -> cw_orch::anyhow::Result<()> {
+pub fn cavern_integration_test() -> StdResult<()> {
     pretty_env_logger::init();
 
     let sender = Addr::unchecked(SENDER);
@@ -155,7 +156,7 @@ const SENDER: &str = "terra1ytj0hhw39j88qsx4yapsr6ker83jv3aj354gmj";
 const MARKET_ADDR: &str = "terra1zqlcp3aty4p4rjv96h6qdascdn953v6crhwedu5vddxjnp349upscluex6";
 const CURRENCY: &str = "ibc/B3504E092456BA618CC28AC671A71FB08C6CA0FD0BE7C8A5B5A3E2DD933CC9E4";
 
-fn query_a_currency_balance(chain: &CloneTesting) -> cw_orch::anyhow::Result<BalanceResponse> {
+fn query_a_currency_balance(chain: &CloneTesting) -> StdResult<BalanceResponse> {
     Ok(chain.query(
         &Cw20QueryMsg::Balance {
             address: chain.sender.to_string(),
@@ -165,7 +166,7 @@ fn query_a_currency_balance(chain: &CloneTesting) -> cw_orch::anyhow::Result<Bal
 }
 
 #[test]
-fn query_hash() -> cw_orch::anyhow::Result<()> {
+fn query_hash() -> StdResult<()> {
     let app = CloneTesting::new(PHOENIX_1)?;
     let market = CavernMarket::new("cavern:money-market", app.clone());
     let market_addr = Addr::unchecked(MARKET_ADDR);
@@ -177,7 +178,7 @@ fn query_hash() -> cw_orch::anyhow::Result<()> {
 }
 
 #[test]
-fn query_contract_info() -> cw_orch::anyhow::Result<()> {
+fn query_contract_info() -> StdResult<()> {
     let app = CloneTesting::new(PHOENIX_1)?;
     let market = CavernMarket::new("cavern:money-market", app.clone());
     let market_addr = Addr::unchecked(MARKET_ADDR);

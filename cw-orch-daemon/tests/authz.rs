@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn authz() -> anyhow::Result<()> {
+    fn authz() -> StdResult<()> {
         super::common::enable_logger();
         use cw_orch_networks::networks;
 

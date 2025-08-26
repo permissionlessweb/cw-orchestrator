@@ -15,7 +15,7 @@ daemon = ["dep:cw-orch-daemon"]
 
 [dependencies]
 base64            = "0.22.1"
-cosmwasm-schema   = "2.1.3"
+cosmwasm-schema   = "3.0.0"
 cosmwasm-std      = { workspace = true }
 cw-orch-core      = { workspace = true }
 cw-orch-daemon    = { workspace = true, optional = true }
@@ -24,12 +24,12 @@ futures           = "0.3.30"
 ibc-relayer-types = { workspace = true }
 log               = { workspace = true }
 # TODO: polytone = "2.0.0"
-prost      = "0.13.1"
+prost      = "0.14.1"
 serde      = { workspace = true }
 serde_json = { workspace = true }
 thiserror  = { workspace = true }
 tokio      = "1.39.2"
-tonic      = { workspace = true, features = ["tls", "tls-roots"] }
+tonic      = { workspace = true }
 
 [dev-dependencies]
 cosmos-sdk-proto   = { workspace = true }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use cosmwasm_std::{testing::MockApi, Addr, Coin, Uint128};
+use cosmwasm_std::{coin, testing::MockApi, Addr, Coin, Uint256};
 use cw_multi_test::{AppBuilder, MockApiBech32};
 use cw_orch_core::{
     environment::{BankQuerier, BankSetter, DefaultQueriers, StateInterface, TxHandler},
@@ -104,7 +104,11 @@ impl<S: StateInterface> MockBech32<S> {
         amount: Vec<cosmwasm_std::Coin>,
     ) -> Result<(), CwEnvError> {
         let addr = &address;
-        let b = self.query_all_balances(addr)?;
+        let mut b = Vec::new();
+        for a in &amount {
+            let am = self.query_balance(addr, &a.denom)?;
+            b.push(coin(am.to_string().parse()?, a.denom.clone()));
+        }
         let new_amount = NativeBalance(b) + NativeBalance(amount);
         self.app
             .borrow_mut()
@@ -133,7 +137,7 @@ impl<S: StateInterface> MockBech32<S> {
 
     /// Query the (bank) balance of a native token for and address.
     /// Returns the amount of the native token.
-    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint128, CwEnvError> {
+    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint256, CwEnvError> {
         Ok(self
             .bank_querier()
             .balance(address, Some(denom.to_string()))?
@@ -142,13 +146,13 @@ impl<S: StateInterface> MockBech32<S> {
             .unwrap_or_default())
     }
 
-    /// Fetch all the balances of an address.
-    pub fn query_all_balances(
-        &self,
-        address: &Addr,
-    ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
-        self.bank_querier().balance(address, None)
-    }
+    // /// Fetch all the balances of an address.
+    // pub fn query_all_balances(
+    //     &self,
+    //     address: &Addr,
+    // ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
+    //     self.bank_querier().balance(address, None)
+    // }
 }
 
 impl<S: StateInterface> BankSetter for MockBech32<S> {
@@ -165,12 +169,12 @@ impl<S: StateInterface> BankSetter for MockBech32<S> {
 
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::coins;
+    use cosmwasm_std::{coins, StdResult};
 
     use crate::MockBech32;
     use cw_orch_core::environment::{BankQuerier, DefaultQueriers};
     #[test]
-    fn addr_make_with_balance() -> anyhow::Result<()> {
+    fn addr_make_with_balance() -> StdResult<()> {
         let mock = MockBech32::new("mock");
 
         let address = mock.addr_make_with_balance("sender", coins(42765, "ujuno"))?;

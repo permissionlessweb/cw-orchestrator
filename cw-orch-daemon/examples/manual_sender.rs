@@ -16,7 +16,7 @@ use cosmrs::proto::cosmos::vesting::v1beta1::PeriodicVestingAccount;
 use cosmrs::tendermint::chain::Id;
 use cosmrs::tx::{ModeInfo, Raw, SignDoc, SignMode, SignerInfo};
 use cosmrs::{AccountId, Any};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, StdResult};
 use cw_orch::prelude::*;
 use cw_orch_core::environment::ChainInfoOwned;
 use prost::Message;
@@ -30,7 +30,7 @@ use counter_contract::CounterContract;
 
 // This is a test with a manual sender, to verify everything works, nothing is broadcasted
 
-pub fn main() -> anyhow::Result<()> {
+pub fn main() -> StdResult<()> {
     dotenv::dotenv().ok(); // Used to load the `.env` file if any
     pretty_env_logger::init(); // Used to log contract and chain interactions
 

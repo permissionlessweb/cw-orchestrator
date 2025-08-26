@@ -40,6 +40,7 @@ pub trait BankSetter: TxHandler + QuerierGetter<Self::T> {
         let future_balance = NativeBalance(current_balance) + NativeBalance(amount);
         // Set the balance with more funds
         self.set_balance(address, future_balance.into_vec())?;
+
         Ok(())
     }
 }

@@ -23,7 +23,7 @@ Behind the scenes, `MockBech32` objects are created with the specified chain ids
 ```rust,ignore
 # use cw_orch::prelude::*;
 # use cw_orch_interchain::prelude::*;
-# fn main() -> anyhow::Result<()>{
+# fn main() -> StdResult<()>{
     # let interchain = MockBech32InterchainEnv::new(
     #      vec![("juno-1", "juno"), ("osmosis-1", "osmosis")],
     # );
@@ -55,7 +55,7 @@ You can also add mocks manually to the `interchain` object, after instantiation:
 
 All interchain environments are centered around the `await_single_packet` function. In the `Mock` case, this function is responsible for relaying the packets between the different chains. Using the exact same interface as with other environments, it takes care of all packet relaying procedures.
 
-This function will relay a packets successfully from the receiving chain back to the source chain. Here is what the full cycle looks like:
+This function will relay a packets successfully from the receiving chain back the the source chain. Here is what the full cycle looks like:
 
 1. <span style="color:purple">⬤</span> On the `source chain`, it queries the packet data associated with the packet channel and sequence.
 2. <span style="color:red">⬤</span> On the `destination chain`, it triggers a receive transaction for that packet.
@@ -67,7 +67,7 @@ Finally, the recommended function is `await_and_check_packets`. This will run `a
 
 ```rust,ignore
 # use cw_orch_interchain::prelude::*;
-# fn main() -> anyhow::Result<()>{
+# fn main() -> StdResult<()>{
     # let mut interchain = MockBech32InterchainEnv::new(
     #    vec![("juno-1", "juno"), ("osmosis-1", "osmosis")],
     # );
@@ -101,7 +101,7 @@ cw-orchestrator also provides tooling for creating channels between mock environ
 
 ```rust,ignore
 # use cw_orch_interchain::prelude::*;
-# fn main() -> anyhow::Result<()>{
+# fn main() -> StdResult<()>{
     let port_id = PortId::transfer();
     # let mut interchain = MockBech32InterchainEnv::new(
     #    vec![("juno-1", "juno"), ("osmosis-1", "osmosis")],

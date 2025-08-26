@@ -439,11 +439,13 @@ mod tempstate {
 pub mod test {
     use std::env;
 
+    use cosmwasm_std::StdResult;
+
     use crate::{env::STATE_FILE_ENV_NAME, DaemonState};
 
     #[test]
     #[serial_test::serial]
-    fn test_env_variable_state_path() -> anyhow::Result<()> {
+    fn test_env_variable_state_path() -> StdResult<()> {
         let absolute_path = "/usr/var/file.json";
         let relative_path = "folder/file.json";
         let dotted_relative_path = format!("./{}", relative_path);

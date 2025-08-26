@@ -99,7 +99,7 @@ impl<Chain> Uploadable for Cw20Base<Chain> {
     }
 }
 
-pub fn main() -> anyhow::Result<()> {
+pub fn main() -> StdResult<()> {
     let mock = MockBech32::new("mock");
 
     let contract = Cw20::new("cw20", mock.clone());

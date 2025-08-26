@@ -321,12 +321,14 @@ fn key_to_addr(data: &[u8], prefix: &str) -> Result<String, DaemonError> {
 }
 #[cfg(test)]
 mod tst {
+    use cosmwasm_std::StdResult;
+
     use super::*;
 
     const PREFIX: &str = "terra";
 
     #[test]
-    pub fn tst_conv() -> anyhow::Result<()> {
+    pub fn tst_conv() -> StdResult<()> {
         let pub_key =
             PublicKey::from_account("terra1jnzv225hwl3uxc5wtnlgr8mwy6nlt0vztv3qqm", PREFIX)?;
 
@@ -348,7 +350,7 @@ mod tst {
         Ok(())
     }
     #[test]
-    pub fn test_key_conversions() -> anyhow::Result<()> {
+    pub fn test_key_conversions() -> StdResult<()> {
         let pub_key = PublicKey::from_public_key(&hex::decode(
             "02cf7ed0b5832538cd89b55084ce93399b186e381684b31388763801439cbdd20a",
         )?);
@@ -432,7 +434,7 @@ mod tst {
         Ok(())
     }
     #[test]
-    pub fn test_tendermint() -> anyhow::Result<()> {
+    pub fn test_tendermint() -> StdResult<()> {
         let secp256k1_public_key_str =
             "02A1633CAFCC01EBFB6D78E39F687A1F0995C62FC95F51EAD10A02EE0BE551B5DC";
         let seccp256k1_public_key =
@@ -470,7 +472,7 @@ mod tst {
         Ok(())
     }
     #[test]
-    pub fn test_proposer() -> anyhow::Result<()> {
+    pub fn test_proposer() -> StdResult<()> {
         //   dotenv().ok();
         //   env_logger::init();
 

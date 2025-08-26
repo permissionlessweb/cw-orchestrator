@@ -44,15 +44,15 @@ mod interfaces {
         /// Transfer is a base message to move tokens to another account without triggering actions
         Transfer {
             recipient: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
         },
         /// Burn is a base message to destroy tokens forever
-        Burn { amount: cosmwasm_std::Uint128 },
+        Burn { amount: cosmwasm_std::Uint256 },
         /// Send is a base message to transfer tokens to a contract and trigger an action
         /// on the receiving contract.
         Send {
             contract: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
             msg: cosmwasm_std::Binary,
         },
         /// Only with "approval" extension. Allows spender to access an additional amount tokens
@@ -60,7 +60,7 @@ mod interfaces {
         /// expiration with this one.
         IncreaseAllowance {
             spender: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
             expires: Option<cw20::Expiration>,
         },
         /// Only with "approval" extension. Lowers the spender's access of tokens
@@ -68,7 +68,7 @@ mod interfaces {
         /// allowance expiration with this one.
         DecreaseAllowance {
             spender: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
             expires: Option<cw20::Expiration>,
         },
         /// Only with "approval" extension. Transfers amount tokens from owner -> recipient
@@ -76,26 +76,26 @@ mod interfaces {
         TransferFrom {
             owner: String,
             recipient: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
         },
         /// Only with "approval" extension. Sends amount tokens from owner -> contract
         /// if `env.sender` has sufficient pre-approval.
         SendFrom {
             owner: String,
             contract: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
             msg: cosmwasm_std::Binary,
         },
         /// Only with "approval" extension. Destroys tokens forever
         BurnFrom {
             owner: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
         },
         /// Only with the "mintable" extension. If authorized, creates amount new tokens
         /// and adds to the recipient balance.
         Mint {
             recipient: String,
-            amount: cosmwasm_std::Uint128,
+            amount: cosmwasm_std::Uint256,
         },
         /// Only with the "mintable" extension. The current minter may set
         /// a new minter. Setting the minter to None will remove the

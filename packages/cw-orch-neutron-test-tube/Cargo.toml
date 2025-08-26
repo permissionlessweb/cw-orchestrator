@@ -15,6 +15,7 @@ version              = "0.2.2"
 neutron-test-tube = { workspace = true }
 
 cosmwasm-std   = { workspace = true }
+cosmos-sdk-proto   = { workspace = true }
 cw-orch-core   = { workspace = true }
 cw-orch-mock   = { workspace = true }
 cw-orch-traits = { workspace = true }

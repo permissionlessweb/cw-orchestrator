@@ -5,12 +5,14 @@ use crate::{
     tx_resp::CosmTxResponse, DaemonBase,
 };
 
+use cosmrs::proto::tendermint::types::Block;
+
 use cosmrs::{
     proto::cosmos::{
         base::query::v1beta1::PageRequest,
         tx::v1beta1::{OrderBy, SimulateResponse},
     },
-    tendermint::{Block, Time},
+    tendermint::Time,
 };
 use cosmwasm_std::BlockInfo;
 use cw_orch_core::{
@@ -92,7 +94,8 @@ impl Node {
             .await?
             .into_inner();
 
-        Ok(Block::try_from(resp.block.unwrap())?)
+        resp.block
+            .ok_or_else(|| DaemonError::StdErr("Block not found in response".to_string()))
     }
 
     /// Returns block information fetched by height
@@ -107,7 +110,8 @@ impl Node {
             .await?
             .into_inner();
 
-        Ok(Block::try_from(resp.block.unwrap())?)
+        resp.block
+            .ok_or_else(|| DaemonError::StdErr("Block not found in response".to_string()))
     }
 
     /// Return the average block time for the last 50 blocks or since inception
@@ -118,14 +122,16 @@ impl Node {
     ) -> Result<Duration, DaemonError> {
         // get latest block time and height
         let mut latest_block = self._latest_block().await?;
-        let latest_block_time = latest_block.header.time;
-        let mut latest_block_height = latest_block.header.height.value();
+        let header = latest_block.header.ok_or_else(|| DaemonError::StdErr("Block header not found".to_string()))?;
+        let proto_time = header.time.ok_or_else(|| DaemonError::StdErr("Block time not found".to_string()))?;
+        let latest_block_time = Time::from_unix_timestamp(proto_time.seconds, proto_time.nanos as u32)?;
+        let mut latest_block_height = header.height;
 
         while latest_block_height <= 1 {
             // wait to get some blocks
             tokio::time::sleep(Duration::from_secs(1)).await;
             latest_block = self._latest_block().await?;
-            latest_block_height = latest_block.header.height.value();
+            latest_block_height = latest_block.header.ok_or_else(|| DaemonError::StdErr("Block header not found".to_string()))?.height;
         }
 
         // let avg period
@@ -133,9 +139,10 @@ impl Node {
 
         // get block time for block avg_period blocks ago
         let block_avg_period_ago = self
-            ._block_by_height(latest_block_height - avg_period)
+            ._block_by_height((latest_block_height - avg_period) as u64)
             .await?;
-        let block_avg_period_ago_time = block_avg_period_ago.header.time;
+        let proto_time_ago = block_avg_period_ago.header.ok_or_else(|| DaemonError::StdErr("Block header not found".to_string()))?.time.ok_or_else(|| DaemonError::StdErr("Block time not found".to_string()))?;
+        let block_avg_period_ago_time = Time::from_unix_timestamp(proto_time_ago.seconds, proto_time_ago.nanos as u32)?;
 
         // calculate average block time
         let average_block_time = latest_block_time.duration_since(block_avg_period_ago_time)?;
@@ -190,17 +197,17 @@ impl Node {
     /// Returns current block height
     pub async fn _block_height(&self) -> Result<u64, DaemonError> {
         let block = self._latest_block().await?;
-        Ok(block.header.height.value())
+        let header = block.header.ok_or_else(|| DaemonError::StdErr("Block header not found".to_string()))?;
+        Ok(header.height as u64)
     }
 
     /// Returns the block timestamp (since unix epoch) in nanos
     pub async fn _block_time(&self) -> Result<u128, DaemonError> {
         let block = self._latest_block().await?;
-        Ok(block
-            .header
-            .time
-            .duration_since(Time::unix_epoch())?
-            .as_nanos())
+        let header = block.header.ok_or_else(|| DaemonError::StdErr("Block header not found".to_string()))?;
+        let proto_time = header.time.ok_or_else(|| DaemonError::StdErr("Block time not found".to_string()))?;
+        let time = Time::from_unix_timestamp(proto_time.seconds, proto_time.nanos as u32)?;
+        Ok(time.duration_since(Time::unix_epoch())?.as_nanos())
     }
 
     /// Simulate TX
@@ -417,11 +424,14 @@ impl NodeQuerier for Node {
 }
 
 fn block_to_block_info(block: Block) -> Result<BlockInfo, DaemonError> {
-    let since_epoch = block.header.time.duration_since(Time::unix_epoch())?;
+    let header = block.header.ok_or_else(|| DaemonError::StdErr("Block header not found".to_string()))?;
+    let proto_time = header.time.ok_or_else(|| DaemonError::StdErr("Block time not found".to_string()))?;
+    let time_timestamp = Time::from_unix_timestamp(proto_time.seconds, proto_time.nanos as u32)?;
+    let since_epoch = time_timestamp.duration_since(Time::unix_epoch())?;
     let time = cosmwasm_std::Timestamp::from_nanos(since_epoch.as_nanos() as u64);
     Ok(cosmwasm_std::BlockInfo {
-        height: block.header.height.value(),
+        height: header.height as u64,
         time,
-        chain_id: block.header.chain_id.to_string(),
+        chain_id: header.chain_id,
     })
 }

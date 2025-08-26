@@ -80,7 +80,7 @@ pub trait DefaultQueriers:
 
 #[cfg(test)]
 pub mod test {
-    use cosmwasm_std::{Addr, Binary, Coin};
+    use cosmwasm_std::{Addr, Binary, Coin, StdResult};
     use serde::Serialize;
 
     use crate::{
@@ -301,14 +301,15 @@ pub mod test {
         }
     }
 
-    fn associated_querier_error<T: QueryHandler>(t: T) -> anyhow::Result<()> {
-        t.bank_querier().balance(&Addr::unchecked("anyone"), None)?;
+    fn associated_querier_error<T: QueryHandler>(t: T) -> StdResult<()> {
+        t.bank_querier()
+            .balance(&Addr::unchecked("anyone"), Some("fake".into()))?;
         t.wait_blocks(7)?;
         Ok(())
     }
 
     #[test]
-    fn query_handler_error_usable_on_anyhow() -> anyhow::Result<()> {
+    fn query_handler_error_usable_on_anyhow() -> StdResult<()> {
         associated_querier_error(MockHandler {})?;
         Ok(())
     }

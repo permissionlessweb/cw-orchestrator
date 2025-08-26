@@ -55,7 +55,7 @@ pub fn full_ica_test<Chain: IbcQueryHandler, IBC: InterchainEnv<Chain>>(
     host_chain_id: &str,
     controller_chain_id: &str,
     host_funds_denom: &str,
-) -> cw_orch::anyhow::Result<()> {
+) -> StdResult<()> {
     let host_chain = interchain.get_chain(host_chain_id)?;
     let controller_chain = interchain.get_chain(controller_chain_id)?;
 
@@ -83,7 +83,7 @@ fn deploy_contracts<Chain: CwEnv>(
     cw1: &Cw1<Chain>,
     host: &Host<Chain>,
     controller: &Controller<Chain>,
-) -> cw_orch::anyhow::Result<()> {
+) -> StdResult<()> {
     cw1.upload()?;
     host.upload()?;
     controller.upload()?;
@@ -129,7 +129,12 @@ fn test_ica<Chain: IbcQueryHandler, IBC: InterchainEnv<Chain>>(
         .balance(&remote_addr, Some(host_funds_denom.to_string()))
         .map_err(Into::into)?;
 
-    assert_that!(&balance[0].amount.u128()).is_equal_to(100);
+    assert_that!(&balance[0]
+        .amount
+        .to_string()
+        .parse::<u64>()
+        .map_err(StdError::msg)?)
+    .is_equal_to(100);
 
     // burn the juno remotely
     let burn_response = controller.execute(
@@ -158,7 +163,12 @@ fn test_ica<Chain: IbcQueryHandler, IBC: InterchainEnv<Chain>>(
         .bank_querier()
         .balance(&remote_addr, Some(host_funds_denom.to_string()))
         .map_err(Into::into)?;
-    assert_that!(&balance[0].amount.u128()).is_equal_to(0);
+    assert_that!(&balance[0]
+        .amount
+        .to_string()
+        .parse::<u64>()
+        .map_err(StdError::msg)?)
+    .is_equal_to(0);
     Ok(())
 }
 
@@ -197,7 +207,7 @@ impl<Chain: CwEnv> Uploadable for Controller<Chain> {
 }
 
 pub fn host_execute(_: DepsMut, _: Env, _: MessageInfo, _: Empty) -> StdResult<Response> {
-    Err(StdError::generic_err("Execute not implemented for host"))
+    Err(StdError::msg("Execute not implemented for host"))
 }
 
 #[interface(host_msgs::InstantiateMsg, Empty, host_msgs::QueryMsg, Empty)]

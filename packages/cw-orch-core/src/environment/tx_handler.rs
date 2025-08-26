@@ -140,7 +140,7 @@ impl From<AccessConfig> for cosmos_sdk_proto::cosmwasm::wasm::v1::AccessConfig {
 // TODO: Perfect test candidate for `trybuild`
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::Empty;
+    use cosmwasm_std::{Empty, StdResult};
     use cw_multi_test::AppResponse;
 
     use crate::environment::StateInterface;
@@ -269,12 +269,12 @@ mod tests {
         }
     }
 
-    fn associated_error<T: TxHandler>(t: T) -> anyhow::Result<()> {
+    fn associated_error<T: TxHandler>(t: T) -> StdResult<()> {
         t.instantiate(0, &Empty {}, None, None, &[])?;
         Ok(())
     }
     #[test]
-    fn tx_handler_error_usable_on_anyhow() -> anyhow::Result<()> {
+    fn tx_handler_error_usable_on_anyhow() -> StdResult<()> {
         associated_error(MockHandler {})?;
         Ok(())
     }

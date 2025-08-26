@@ -184,6 +184,7 @@ impl DaemonBuilder {
 
 #[cfg(test)]
 mod test {
+    use cosmwasm_std::StdResult;
     use cw_orch_core::environment::TxHandler;
     use cw_orch_networks::networks::JUNO_1;
 
@@ -259,7 +260,7 @@ mod test {
 
     #[test]
     #[serial_test::serial]
-    fn hd_index_re_generates_sender() -> anyhow::Result<()> {
+    fn hd_index_re_generates_sender() -> StdResult<()> {
         let daemon = DaemonBuilder::new(JUNO_1)
             .mnemonic(DUMMY_MNEMONIC)
             .is_test(true)

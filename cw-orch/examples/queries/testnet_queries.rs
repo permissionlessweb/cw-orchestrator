@@ -1,5 +1,5 @@
-use anyhow::Result as AnyResult;
 use cosmwasm_std::Addr;
+use cosmwasm_std::StdResult;
 use cw_orch::daemon::Daemon;
 use cw_orch::prelude::BankQuerier;
 use cw_orch::prelude::QuerierGetter;
@@ -7,7 +7,7 @@ use cw_orch_daemon::queriers::Ibc;
 use cw_orch_daemon::queriers::{Bank, Staking};
 pub const TEST_MNEMONIC: &str="scare silent genuine cheese monitor industry item cloth pet gather cruise long confirm van lunar tomato scrub silk guide eight truly rural remember swim";
 
-pub fn main() -> AnyResult<()> {
+pub fn main() -> StdResult<()> {
     // We start by creating a daemon. This daemon will be used to interact with the chain.
     let daemon = Daemon::builder(cw_orch::daemon::networks::JUNO_1) // chain parameter
         .mnemonic(TEST_MNEMONIC)

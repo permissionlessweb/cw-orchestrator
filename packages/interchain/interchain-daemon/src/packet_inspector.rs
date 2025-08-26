@@ -1,6 +1,6 @@
 //! Module for tracking a specific packet inside the interchain
 
-use cosmrs::proto::ibc::core::channel::v1::State;
+use ibc_proto::ibc::core::channel::v1::State;
 use cw_orch_core::environment::{ChainInfoOwned, ChainState};
 use cw_orch_daemon::networks::parse_network;
 use cw_orch_daemon::queriers::{Ibc, Node};

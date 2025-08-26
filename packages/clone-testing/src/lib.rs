@@ -23,7 +23,7 @@ mod contract {
         },
         Contract,
     };
-    use cosmwasm_std::{Checksum, Deps, DepsMut, Empty, QuerierWrapper};
+    use cosmwasm_std::{Checksum, Deps, DepsMut, Empty, MigrateInfo, QuerierWrapper, StdResult};
 
     pub struct CloneTestingContract(Box<dyn cw_orch_mock::cw_multi_test::Contract<Empty, Empty>>);
 
@@ -41,7 +41,7 @@ mod contract {
             info: cosmwasm_std::MessageInfo,
             msg: Vec<u8>,
             fork_state: ForkState<Empty, Empty>,
-        ) -> anyhow::Result<cosmwasm_std::Response> {
+        ) -> StdResult<cosmwasm_std::Response> {
             let querier = MockQuerier::new(fork_state.clone());
             let mut storage = DualStorage::new(
                 fork_state.remote,
@@ -63,7 +63,7 @@ mod contract {
             info: cosmwasm_std::MessageInfo,
             msg: Vec<u8>,
             fork_state: ForkState<Empty, Empty>,
-        ) -> anyhow::Result<cosmwasm_std::Response> {
+        ) -> StdResult<cosmwasm_std::Response> {
             let querier = MockQuerier::new(fork_state.clone());
             let mut storage = DualStorage::new(
                 fork_state.remote,
@@ -84,7 +84,7 @@ mod contract {
             env: cosmwasm_std::Env,
             msg: Vec<u8>,
             fork_state: ForkState<Empty, Empty>,
-        ) -> anyhow::Result<cosmwasm_std::Binary> {
+        ) -> StdResult<cosmwasm_std::Binary> {
             let querier = MockQuerier::new(fork_state.clone());
             let storage = DualStorage::new(
                 fork_state.remote,
@@ -105,7 +105,7 @@ mod contract {
             env: cosmwasm_std::Env,
             msg: Vec<u8>,
             fork_state: ForkState<Empty, Empty>,
-        ) -> anyhow::Result<cosmwasm_std::Response> {
+        ) -> StdResult<cosmwasm_std::Response> {
             let querier = MockQuerier::new(fork_state.clone());
             let mut storage = DualStorage::new(
                 fork_state.remote,
@@ -126,7 +126,7 @@ mod contract {
             env: cosmwasm_std::Env,
             msg: cosmwasm_std::Reply,
             fork_state: ForkState<Empty, Empty>,
-        ) -> anyhow::Result<cosmwasm_std::Response> {
+        ) -> StdResult<cosmwasm_std::Response> {
             let querier = MockQuerier::new(fork_state.clone());
             let mut storage = DualStorage::new(
                 fork_state.remote,
@@ -145,9 +145,10 @@ mod contract {
             &self,
             deps: cosmwasm_std::DepsMut<cosmwasm_std::Empty>,
             env: cosmwasm_std::Env,
+            info: MigrateInfo,
             msg: Vec<u8>,
             fork_state: ForkState<Empty, Empty>,
-        ) -> anyhow::Result<cosmwasm_std::Response> {
+        ) -> StdResult<cosmwasm_std::Response> {
             let querier = MockQuerier::new(fork_state.clone());
             let mut storage = DualStorage::new(
                 fork_state.remote,
@@ -159,7 +160,7 @@ mod contract {
                 api: deps.api,
                 querier: QuerierWrapper::new(&querier),
             };
-            self.0.migrate(deps, env, msg)
+            self.0.migrate(deps, env, msg, info)
         }
 
         /// Returns the provided checksum of the contract's Wasm blob.

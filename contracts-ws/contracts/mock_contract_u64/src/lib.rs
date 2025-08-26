@@ -2,7 +2,7 @@ use mock_contract::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, ThirdRetur
 
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult,
+    StdResult, Uint256,
 };
 
 #[entry_point]
@@ -26,7 +26,7 @@ pub fn execute(
         ExecuteMsg::FirstMessage {} => {
             Ok(Response::new().add_attribute("action", "first message passed"))
         }
-        ExecuteMsg::SecondMessage { t: _ } => Err(StdError::generic_err("Second Message Failed")),
+        ExecuteMsg::SecondMessage { t: _ } => Err(StdError::msg("Second Message Failed")),
         ExecuteMsg::ThirdMessage { .. } => {
             Ok(Response::new().add_attribute("action", "third message passed"))
         }
@@ -35,7 +35,7 @@ pub fn execute(
         }
         ExecuteMsg::FifthMessage => {
             if info.funds.is_empty() {
-                return Err(StdError::generic_err("Coins missing"));
+                return Err(StdError::msg("Coins missing"));
             }
             Ok(Response::new().add_attribute("action", "fourth message passed"))
         }
@@ -44,8 +44,8 @@ pub fn execute(
         }
         ExecuteMsg::SeventhMessage(amount, denom) => {
             let c = info.funds[0].clone();
-            if c.amount != amount && c.denom.ne(&denom) {
-                return Err(StdError::generic_err("Coins don't match message"));
+            if c.amount != Uint256::new(amount.u128()) && c.denom.ne(&denom) {
+                return Err(StdError::msg("Coins don't match message"));
             }
             Ok(Response::new().add_attribute("action", "fourth message passed"))
         }
@@ -56,7 +56,7 @@ pub fn execute(
 pub fn query(_deps: Deps, _env: Env, msg: QueryMsg<u64>) -> StdResult<Binary> {
     match msg {
         QueryMsg::FirstQuery {} => to_json_binary("first query passed"),
-        QueryMsg::SecondQuery { .. } => Err(StdError::generic_err("Query not available")),
+        QueryMsg::SecondQuery { .. } => Err(StdError::msg("Query not available")),
         QueryMsg::ThirdQuery { .. } => to_json_binary(&ThirdReturn { t: 0u64 }),
         QueryMsg::FourthQuery(_, _) => to_json_binary("fourth query passed"),
     }
@@ -67,7 +67,7 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
     if msg.t.eq("success") {
         Ok(Response::new())
     } else {
-        Err(StdError::generic_err(
+        Err(StdError::msg(
             "migrate endpoint reached but no test implementation",
         ))
     }

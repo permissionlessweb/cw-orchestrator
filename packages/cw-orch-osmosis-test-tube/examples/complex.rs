@@ -1,4 +1,4 @@
-use cosmwasm_std::{coin, coins};
+use cosmwasm_std::{coin, coins, StdResult};
 use counter_contract::{
     msg::{ExecuteMsg, InstantiateMsg},
     CounterContract, CounterExecuteMsgFns, CounterQueryMsgFns,
@@ -15,7 +15,7 @@ use prost::Message;
 use prost_types::Any;
 
 pub const SUBDENOM: &str = "sub-denom";
-pub fn main() -> cw_orch::anyhow::Result<()> {
+pub fn main() -> StdResult<()> {
     env_logger::init();
     let chain = OsmosisTestTube::new(coins(1_000_000_000_000, "uosmo"));
 

@@ -1,6 +1,6 @@
 pub use osmosis_test_tube;
 
-use cosmwasm_std::{coin, Addr, BankMsg, Coins};
+use cosmwasm_std::{coin, Addr, BankMsg, Coins, Uint256};
 
 use cw_orch_core::contract::interface_traits::Uploadable;
 use cw_orch_core::contract::WasmPath;
@@ -158,21 +158,21 @@ impl<S: StateInterface> OsmosisTestTube<S> {
         &self,
         address: impl Into<String>,
         denom: &str,
-    ) -> Result<Uint128, CwEnvError> {
+    ) -> Result<Uint256, CwEnvError> {
         let amount = self
             .bank_querier()
             .balance(&Addr::unchecked(address), Some(denom.to_string()))?;
         Ok(amount.first().unwrap().amount)
     }
 
-    /// Fetch all the balances of an address.
-    pub fn query_all_balances(
-        &self,
-        address: &Addr,
-    ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
-        let amount = self.bank_querier().balance(address, None)?;
-        Ok(amount)
-    }
+    // /// Fetch all the balances of an address.
+    // pub fn query_all_balances(
+    //     &self,
+    //     address: &Addr,
+    // ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
+    //     let amount = self.bank_querier().balance(address, None)?;
+    //     Ok(amount)
+    // }
 }
 
 impl OsmosisTestTube<MockState> {
@@ -443,7 +443,7 @@ impl Stargate for OsmosisTestTube {
 
 #[cfg(test)]
 pub mod tests {
-    use cosmwasm_std::{coin, coins, ContractInfoResponse};
+    use cosmwasm_std::{coin, coins, ContractInfoResponse, StdResult};
 
     use osmosis_test_tube::Account;
 
@@ -454,7 +454,7 @@ pub mod tests {
     use cw_orch::prelude::*;
 
     #[test]
-    fn wasm_querier_works() -> cw_orch::anyhow::Result<()> {
+    fn wasm_querier_works() -> StdResult<()> {
         let app = OsmosisTestTube::new(coins(100_000_000_000_000, "uosmo"));
 
         let contract = CounterContract::new(app.clone());
@@ -477,6 +477,7 @@ pub mod tests {
             Some(app.sender_addr()),
             false,
             None,
+            None,
         );
         assert_eq!(contract_info, target_contract_info);
 
@@ -484,7 +485,7 @@ pub mod tests {
     }
 
     #[test]
-    fn bank_querier_works() -> cw_orch::anyhow::Result<()> {
+    fn bank_querier_works() -> StdResult<()> {
         let denom = "urandom";
         let init_coins = coins(45, denom);
         let app = OsmosisTestTube::new(init_coins.clone());
@@ -502,31 +503,39 @@ pub mod tests {
     }
 
     #[test]
-    fn add_balance_works() -> cw_orch::anyhow::Result<()> {
+    fn add_balance_works() -> StdResult<()> {
         let denom = "uosmo";
         let init_coins = coins(100_000_000_000_000, denom);
         let mut app = OsmosisTestTube::new(init_coins.clone());
-
         let account = app.init_account(coins(78, "uweird"))?;
         let account_address = Addr::unchecked(account.address());
+        let amounts = [139823876u128, 1398212713563876u128];
+        let denoms = [GAS_TOKEN, "uother"];
 
-        let amount1 = 139823876u128;
-        let amount2 = 1398212713563876u128;
-        app.add_balance(
-            &account_address,
-            vec![coin(amount1, GAS_TOKEN), coin(amount2, "uother")],
-        )?;
+        // Send both denoms at once
+        let coins_to_add = amounts
+            .iter()
+            .zip(denoms.iter())
+            .map(|(&amount, denom)| coin(amount, *denom))
+            .collect::<Vec<_>>();
+        app.add_balance(&account_address, coins_to_add.clone())?;
 
-        let balance = app.bank_querier().balance(&account_address, None)?;
+        let mut balances = Vec::with_capacity(coins_to_add.len());
+        // Check balance for each denom
+        for denom in denoms {
+            let balance = app
+                .bank_querier()
+                .balance(&account_address, Some(denom.to_string()))?;
+            balances.extend(balance);
+        }
+        assert_eq!(balances, coins_to_add);
 
-        assert_eq!(
-            balance,
-            vec![
-                coin(amount1, GAS_TOKEN),
-                coin(amount2, "uother"),
-                coin(78, "uweird")
-            ]
-        );
+        // Also check initial balance is still there
+        let initial_denom_balance = app
+            .bank_querier()
+            .balance(&account_address, Some("uweird".to_string()))?;
+        assert_eq!(initial_denom_balance, coins(78, "uweird"));
+
         Ok(())
     }
 }

@@ -8,7 +8,7 @@ use osmosis_std::types::osmosis::tokenfactory::v1beta1::{MsgCreateDenom, MsgMint
 use prost::{Message, Name};
 use tonic::transport::Channel;
 
-use cosmwasm_std::Coin;
+use cosmwasm_std::{Coin, StdResult};
 use cw_orch_core::environment::{CwEnv, TxHandler};
 use cw_orch_traits::FullNode;
 use ibc_relayer_types::core::ics24_host::identifier::PortId;
@@ -134,7 +134,7 @@ pub fn create_transfer_channel<Chain: IbcQueryHandler, IBC: InterchainEnv<Chain>
     chain1: &str,
     chain2: &str,
     interchain: &IBC,
-) -> anyhow::Result<InterchainChannel<<Chain as IbcQueryHandler>::Handler>> {
+) -> StdResult<InterchainChannel<<Chain as IbcQueryHandler>::Handler>> {
     let creation = interchain
         .create_channel(
             chain1,

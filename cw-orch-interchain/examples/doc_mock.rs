@@ -1,8 +1,9 @@
+use cosmwasm_std::StdResult;
 use cw_orch::prelude::*;
 use cw_orch_interchain::prelude::*;
 use ibc_relayer_types::core::ics24_host::identifier::PortId;
 
-fn crate_mock_env() -> cw_orch::anyhow::Result<MockInterchainEnv> {
+fn crate_mock_env() -> StdResult<MockInterchainEnv> {
     let sender = "sender";
     let mut interchain = MockInterchainEnv::new(vec![("juno-1", sender), ("osmosis-1", sender)]);
 
@@ -15,7 +16,7 @@ fn crate_mock_env() -> cw_orch::anyhow::Result<MockInterchainEnv> {
     Ok(interchain)
 }
 
-fn create_channel(interchain: MockInterchainEnv) -> cw_orch::anyhow::Result<()> {
+fn create_channel(interchain: MockInterchainEnv) -> StdResult<()> {
     let src_chain = "juno-1".to_string();
     let dst_chain = "osmosis-1".to_string();
     let port_id = PortId::transfer();
@@ -30,7 +31,7 @@ fn create_channel(interchain: MockInterchainEnv) -> cw_orch::anyhow::Result<()> 
     Ok(())
 }
 
-fn test() -> cw_orch::anyhow::Result<()> {
+fn test() -> StdResult<()> {
     let interchain = crate_mock_env()?;
     create_channel(interchain)?;
     Ok(())

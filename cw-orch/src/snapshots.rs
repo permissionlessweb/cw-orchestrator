@@ -50,7 +50,7 @@ macro_rules! take_storage_snapshot {
 #[cfg(test)]
 mod tests {
     use crate::mock::cw_multi_test::ContractWrapper;
-    use cosmwasm_std::Empty;
+    use cosmwasm_std::{Empty, StdResult};
     use cw_orch::prelude::{CwOrchInstantiate, CwOrchUpload, Mock};
     use cw_orch_core::{
         contract::{interface_traits::Uploadable, WasmPath},
@@ -58,7 +58,7 @@ mod tests {
     };
 
     #[test]
-    fn contract_snapshots() -> anyhow::Result<()> {
+    fn contract_snapshots() -> StdResult<()> {
         use counter_contract::CounterExecuteMsgFns;
         let chain = Mock::new("sender");
 
@@ -104,7 +104,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_contract_snapshot() -> anyhow::Result<()> {
+    fn multiple_contract_snapshot() -> StdResult<()> {
         use counter_contract::CounterExecuteMsgFns;
         let chain = Mock::new("sender");
 

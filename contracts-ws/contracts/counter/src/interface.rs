@@ -1,3 +1,4 @@
+use cosmwasm_std::StdResult;
 use cw_orch::daemon::queriers::Node;
 use cw_orch::environment::ChainInfoOwned;
 // ANCHOR: custom_interface
@@ -35,12 +36,10 @@ impl<Chain> Uploadable for CounterContract<Chain> {
 // ANCHOR_END: uploadable_impl
 // ANCHOR_END: custom_interface
 
-use cw_orch::anyhow::Result;
-
 // ANCHOR: daemon
 impl CounterContract<Daemon> {
     /// Deploys the counter contract at a specific block height
-    pub fn await_launch(&self) -> Result<()> {
+    pub fn await_launch(&self) -> StdResult<()> {
         let daemon = self.environment();
 
         // Get the node query client, there are a lot of other clients available.

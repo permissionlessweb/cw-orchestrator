@@ -1,3 +1,4 @@
+use cosmwasm_std::StdResult;
 use cw_orch::daemon::networks::LOCAL_JUNO;
 use cw_orch::prelude::*;
 use cw_plus_orch::cw1_subkeys::Cw1SubKeys;
@@ -9,7 +10,7 @@ use cw_plus_orch::cw3_flex_multisig::Cw3FlexMultisig;
 use cw_plus_orch::cw4_group::Cw4Group;
 use cw_plus_orch::cw4_stake::Cw4Stake;
 
-fn main() -> cw_orch::anyhow::Result<()> {
+fn main() -> StdResult<()> {
     dotenv::dotenv()?;
     pretty_env_logger::init();
 

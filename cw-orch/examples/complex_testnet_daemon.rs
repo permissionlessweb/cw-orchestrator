@@ -1,4 +1,4 @@
-use cosmwasm_std::coins;
+use cosmwasm_std::{coin, coins};
 use counter_contract::{
     msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg},
     CounterContract, CounterExecuteMsgFns, CounterQueryMsgFns,

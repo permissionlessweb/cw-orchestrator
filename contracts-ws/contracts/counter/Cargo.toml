@@ -5,7 +5,7 @@ exclude     = [".env"]
 keywords    = ["cosmwasm", "blockchain"]
 license     = "LGPL-3.0"
 name        = "counter-contract"
-version     = "0.27.1"
+version     = "0.30.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -15,12 +15,12 @@ default = ["export"]
 export  = []
 
 [dependencies]
-cosmwasm-schema = "2.1"
+cosmwasm-schema = "3.0.1"
 cosmwasm-std    = { workspace = true }
 cw-orch         = { workspace = true, features = ["daemon"] }
 cw-storage-plus = { workspace = true }
-cw2             = "2.0"
-schemars        = "0.8.21"
+cw2             = "3.0"
+schemars = "0.8.4"
 serde           = { workspace = true }
 serde_json      = "1.0.125"
 thiserror       = { version = "1.0.63" }

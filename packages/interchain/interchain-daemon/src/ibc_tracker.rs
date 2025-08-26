@@ -1,7 +1,7 @@
 // We use that here because the Diff attribute on CwIbcContractState pops errors with this macro
 #![allow(missing_docs)]
 
-use cosmrs::proto::ibc::core::channel::v1::State;
+use ibc_proto::ibc::core::channel::v1::State;
 use cw_orch_core::contract::interface_traits::ContractInstance;
 use cw_orch_core::environment::Environment;
 use cw_orch_daemon::queriers::{Ibc, Node};

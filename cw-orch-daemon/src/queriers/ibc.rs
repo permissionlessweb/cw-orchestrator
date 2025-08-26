@@ -1,7 +1,8 @@
 use crate::{cosmos_modules, error::DaemonError, Daemon};
-use cosmos_modules::ibc_channel;
-use cosmrs::proto::cosmos::base::query::v1beta1::PageRequest;
-use cosmrs::proto::ibc::{
+use crate::cosmos_modules::ibc_channel;
+use ibc_proto::{
+    cosmos::base::query::v1beta1::PageRequest,
+    ibc::{
     applications::transfer::v1::{DenomTrace, QueryDenomHashResponse, QueryDenomTraceResponse},
     core::{
         channel::v1::QueryPacketCommitmentResponse,
@@ -9,7 +10,7 @@ use cosmrs::proto::ibc::{
         connection::v1::{ConnectionEnd, IdentifiedConnection, State},
     },
     lightclients::tendermint::v1::ClientState,
-};
+}};
 use cw_orch_core::environment::{Querier, QuerierGetter};
 use prost::Message;
 use tokio::runtime::Handle;

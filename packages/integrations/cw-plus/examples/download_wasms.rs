@@ -1,3 +1,4 @@
+use cosmwasm_std::StdResult;
 use cw_orch::anyhow;
 use std::{io::Cursor, path::PathBuf, str::FromStr};
 
@@ -17,7 +18,7 @@ pub const ALL_CONTRACTS: &[&str] = &[
 ];
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> StdResult<()> {
     let crate_dir = env!("CARGO_MANIFEST_DIR");
     let artifacts_dir = PathBuf::from_str(crate_dir)?.join("artifacts");
 

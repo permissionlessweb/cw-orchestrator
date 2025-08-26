@@ -1,4 +1,4 @@
-use cosmwasm_std::coins;
+use cosmwasm_std::{coins, StdResult};
 use cw_orch::{anyhow, prelude::*};
 use cw_orch_daemon::CosmosOptions;
 
@@ -6,7 +6,7 @@ use cw_orch_daemon::CosmosOptions;
 pub const LOCAL_JUNO_SENDER: &str = "juno16g2rahf5846rxzp3fwlswy08fz8ccuwk03k57y";
 pub const LOCAL_JUNO_GRANTER: &str = "juno1afhtjur8js4589xymu346ca7a5y5293xpuv6ry";
 
-pub fn main() -> anyhow::Result<()> {
+pub fn main() -> StdResult<()> {
     pretty_env_logger::init(); // Used to log contract and chain interactions
 
     let network = networks::LOCAL_JUNO;

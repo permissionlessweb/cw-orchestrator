@@ -6,7 +6,7 @@ use counter_contract::{
 // Use prelude to get all the necessary imports
 use cw_orch::prelude::*;
 
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, StdResult};
 
 // consts for testing
 const USER: &str = "user";
@@ -15,7 +15,7 @@ const ADMIN: &str = "admin";
 
 // ANCHOR: count_test
 #[test]
-fn count() -> anyhow::Result<()> {
+fn count() -> StdResult<()> {
     // Create a user
     let user = Addr::unchecked(USER);
     // Create the mock. This will be our chain object throughout
@@ -62,8 +62,11 @@ fn count() -> anyhow::Result<()> {
 
     let expected_err = ContractError::Unauthorized {};
     assert_eq!(
-        exec_res.unwrap_err().downcast::<ContractError>()?,
-        expected_err
+        exec_res
+            .unwrap_err()
+            .downcast::<ContractError>()?
+            .to_string(),
+        expected_err.to_string(),
     );
 
     Ok(())
@@ -72,7 +75,7 @@ fn count() -> anyhow::Result<()> {
 
 // ANCHOR: setup
 /// Instantiate the contract in any CosmWasm environment
-fn setup<Chain: CwEnv>(chain: Chain) -> anyhow::Result<CounterContract<Chain>> {
+fn setup<Chain: CwEnv>(chain: Chain) -> StdResult<CounterContract<Chain>> {
     // ANCHOR: constructor
     // Construct the counter interface
     let contract = CounterContract::new(chain.clone());

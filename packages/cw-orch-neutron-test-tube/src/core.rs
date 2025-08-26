@@ -1,6 +1,6 @@
 pub use neutron_test_tube;
 
-use cosmwasm_std::{coin, Addr, BankMsg, Coins};
+use cosmwasm_std::{coin, Addr, BankMsg, Coins, Uint256};
 
 use cw_orch_core::contract::interface_traits::Uploadable;
 use cw_orch_core::contract::WasmPath;
@@ -136,21 +136,21 @@ impl<S: StateInterface> NeutronTestTube<S> {
 
     /// Query the (bank) balance of a native token for and address.
     /// Returns the amount of the native token.
-    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint128, CwEnvError> {
+    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint256, CwEnvError> {
         let amount = self
             .bank_querier()
             .balance(address, Some(denom.to_string()))?;
         Ok(amount.first().unwrap().amount)
     }
 
-    /// Fetch all the balances of an address.
-    pub fn query_all_balances(
-        &self,
-        address: &Addr,
-    ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
-        let amount = self.bank_querier().balance(address, None)?;
-        Ok(amount)
-    }
+    // Fetch all the balances of an address.
+    // pub fn query_all_balances(
+    //     &self,
+    //     address: &Addr,
+    // ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
+    //     let amount = self.bank_querier().balance(address, None)?;
+    //     Ok(amount)
+    // }
 }
 
 impl NeutronTestTube<MockState> {
@@ -416,7 +416,7 @@ impl NeutronTestTube {
 
 #[cfg(test)]
 pub mod tests {
-    use cosmwasm_std::{coin, coins, ContractInfoResponse};
+    use cosmwasm_std::{coin, coins, ContractInfoResponse, StdResult};
 
     use neutron_test_tube::Account;
 
@@ -427,7 +427,7 @@ pub mod tests {
     use cw_orch::prelude::*;
 
     #[test]
-    fn wasm_querier_works() -> cw_orch::anyhow::Result<()> {
+    fn wasm_querier_works() -> StdResult<()> {
         let app = NeutronTestTube::new(coins(100_000_000_000_000, "untrn"));
 
         let contract = CounterContract::new(app.clone());
@@ -450,6 +450,7 @@ pub mod tests {
             Some(app.sender_addr()),
             false,
             None,
+            None,
         );
         assert_eq!(contract_info, target_contract_info);
 
@@ -457,7 +458,7 @@ pub mod tests {
     }
 
     #[test]
-    fn bank_querier_works() -> cw_orch::anyhow::Result<()> {
+    fn bank_querier_works() -> StdResult<()> {
         let denom = "urandom";
         let init_coins = coins(45, denom);
         let app = NeutronTestTube::new(init_coins.clone());
@@ -475,7 +476,7 @@ pub mod tests {
     }
 
     #[test]
-    fn add_balance_works() -> cw_orch::anyhow::Result<()> {
+    fn add_balance_works() -> StdResult<()> {
         let denom = "untrn";
         let init_coins = coins(100_000_000_000_000, denom);
         let mut app = NeutronTestTube::new(init_coins.clone());

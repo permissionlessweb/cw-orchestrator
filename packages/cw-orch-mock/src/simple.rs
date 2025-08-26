@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cosmwasm_std::testing::MockApi;
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::{coin, Addr, Coin, Uint256};
 use cw_multi_test::AppBuilder;
 use cw_orch_core::environment::{BankQuerier, BankSetter, TxHandler};
 use cw_orch_core::{
@@ -33,14 +33,19 @@ impl<S: StateInterface> Mock<S> {
         address: &Addr,
         amount: Vec<cosmwasm_std::Coin>,
     ) -> Result<(), CwEnvError> {
-        let b = self.query_all_balances(address)?;
+        let addr = &address;
+        let mut b = Vec::new();
+        for a in &amount {
+            let am = self.query_balance(addr, &a.denom)?;
+            b.push(coin(am.to_string().parse()?, a.denom.clone()));
+        }
         let new_amount = NativeBalance(b) + NativeBalance(amount);
         self.app
             .borrow_mut()
             .init_modules(|router, _, storage| {
                 router
                     .bank
-                    .init_balance(storage, address, new_amount.into_vec())
+                    .init_balance(storage, addr, new_amount.into_vec())
             })
             .map_err(Into::into)
     }
@@ -66,7 +71,7 @@ impl<S: StateInterface> Mock<S> {
 
     /// Query the (bank) balance of a native token for and address.
     /// Returns the amount of the native token.
-    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint128, CwEnvError> {
+    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint256, CwEnvError> {
         Ok(self
             .bank_querier()
             .balance(address, Some(denom.to_string()))?
@@ -75,13 +80,13 @@ impl<S: StateInterface> Mock<S> {
             .unwrap_or_default())
     }
 
-    /// Fetch all the balances of an address.
-    pub fn query_all_balances(
-        &self,
-        address: &Addr,
-    ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
-        self.bank_querier().balance(address, None)
-    }
+    // /// Fetch all the balances of an address.
+    // pub fn query_all_balances(
+    //     &self,
+    //     address: &Addr,
+    // ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
+    //     self.bank_querier().balance(address, None)
+    // }
 }
 
 impl Mock {

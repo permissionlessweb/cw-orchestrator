@@ -1,3 +1,4 @@
+use cosmwasm_std::StdResult;
 use cw_orch::{
     daemon::networks::ARCHWAY_1,
     environment::{ChainInfo, NetworkInfo},
@@ -21,7 +22,7 @@ pub const NOBLE_1: ChainInfo = ChainInfo {
     kind: cw_orch::environment::ChainKind::Mainnet,
 };
 
-fn follow_by_tx_hash() -> cw_orch::anyhow::Result<()> {
+fn follow_by_tx_hash() -> StdResult<()> {
     dotenv::dotenv()?;
 
     let dst_chain = ARCHWAY_1;

@@ -1,10 +1,11 @@
+use cosmwasm_std::StdResult;
 use counter_contract::{
     msg::InstantiateMsg, CounterContract, CounterExecuteMsgFns, CounterQueryMsgFns,
 };
 use cw_orch::prelude::*;
 
 /// This example shows how to create and use the cw-multi-test mock environment
-pub fn main() -> anyhow::Result<()> {
+pub fn main() -> StdResult<()> {
     env_logger::init();
 
     let mock = MockBech32::new("osmosis-1");

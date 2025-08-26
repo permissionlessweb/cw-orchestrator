@@ -12,6 +12,7 @@ version              = "0.24.4"
 [dependencies]
 cosmwasm-std  = { workspace = true, features = ["cosmwasm_1_2"] }
 cw-multi-test = { workspace = true }
+cosmos-sdk-proto = { workspace = true }
 cw-orch-core  = { workspace = true }
 cw-utils      = { workspace = true }
 log           = { workspace = true }
@@ -19,8 +20,8 @@ serde         = { workspace = true }
 sha2          = { workspace = true }
 
 [dev-dependencies]
-cw20      = { version = "2.0.0" }
-cw20-base = { version = "2.0.0" }
+cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
+cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
 speculoos = { workspace = true }
 
 anyhow        = { workspace = true }

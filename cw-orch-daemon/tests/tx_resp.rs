@@ -1,4 +1,4 @@
-use cosmrs::proto::tendermint::v0_34::abci::{Event, EventAttribute};
+use cosmrs::proto::tendermint::abci::{Event, EventAttribute};
 use cw_orch_core::environment::IndexResponse;
 use cw_orch_daemon::parse_timestamp;
 use cw_orch_daemon::CosmTxResponse;

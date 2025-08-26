@@ -200,13 +200,17 @@ impl<Sender: QuerySender> DaemonAsyncBase<Sender> {
 
     /// Get the current block info.
     pub async fn block_info(&self) -> Result<cosmwasm_std::BlockInfo, DaemonError> {
-        let block = Node::new_async(self.channel())._latest_block().await?;
-        let since_epoch = block.header.time.duration_since(Time::unix_epoch())?;
-        let time = cosmwasm_std::Timestamp::from_nanos(since_epoch.as_nanos() as u64);
+        let header = Node::new_async(self.channel())
+            ._latest_block()
+            .await?
+            .header
+            .expect("no block header present");
+        let since_epoch = header.time.expect("");
+        let time = cosmwasm_std::Timestamp::from_nanos(since_epoch.nanos as u64);
         Ok(cosmwasm_std::BlockInfo {
-            height: block.header.height.value(),
+            height: header.height as u64,
             time,
-            chain_id: block.header.chain_id.to_string(),
+            chain_id: header.chain_id,
         })
     }
 }
@@ -449,7 +453,7 @@ pub fn parse_cw_coins(coins: &[cosmwasm_std::Coin]) -> Result<Vec<cosmrs::Coin>,
         .iter()
         .map(|cosmwasm_std::Coin { amount, denom }| {
             Ok(cosmrs::Coin {
-                amount: amount.u128(),
+                amount: amount.to_string().parse()?,
                 denom: Denom::from_str(denom)?,
             })
         })

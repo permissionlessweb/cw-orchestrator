@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use cosmrs::{tx::Msg, AccountId, Coin, Denom};
+use cosmwasm_std::StdResult;
 use cosmwasm_std::{coins, Addr};
 // ANCHOR: full_counter_example
 use cw_orch::prelude::Stargate;
@@ -10,7 +11,7 @@ use cw_orch_networks::networks;
 
 // From https://github.com/CosmosContracts/juno/blob/32568dba828ff7783aea8cb5bb4b8b5832888255/docker/test-user.env#L2
 const LOCAL_MNEMONIC: &str = "clip hire initial neck maid actor venue client foam budget lock catalog sweet steak waste crater broccoli pipe steak sister coyote moment obvious choose";
-pub fn main() -> anyhow::Result<()> {
+pub fn main() -> StdResult<()> {
     std::env::set_var("LOCAL_MNEMONIC", LOCAL_MNEMONIC);
 
     let network = networks::LOCAL_JUNO;

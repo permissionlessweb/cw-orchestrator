@@ -1,8 +1,9 @@
+use cosmwasm_std::StdResult;
 use cw_orch::prelude::networks::{LOCAL_JUNO, LOCAL_MIGALOO, LOCAL_OSMO};
 use cw_orch::prelude::*;
 use cw_orch_interchain::prelude::*;
 
-fn create_daemon_env() -> cw_orch::anyhow::Result<DaemonInterchain> {
+fn create_daemon_env() -> StdResult<DaemonInterchain> {
     // ANCHOR: DAEMON_INTERCHAIN_CREATION
     // This will create `Daemon` structures associated with chains `LOCAL_JUNO` and `LOCAL_OSMO`
     let mut interchain =
@@ -21,7 +22,7 @@ fn create_daemon_env() -> cw_orch::anyhow::Result<DaemonInterchain> {
     Ok(interchain)
 }
 
-fn create_starship_env() -> cw_orch::anyhow::Result<DaemonInterchain<Starship>> {
+fn create_starship_env() -> StdResult<DaemonInterchain<Starship>> {
     // ANCHOR: STARSHIP_INTERCHAIN_CREATION
     let starship = Starship::new(None)?;
     let interchain = starship.interchain_env();
@@ -33,7 +34,7 @@ fn create_starship_env() -> cw_orch::anyhow::Result<DaemonInterchain<Starship>> 
     Ok(interchain)
 }
 
-fn test() -> cw_orch::anyhow::Result<()> {
+fn test() -> StdResult<()> {
     create_daemon_env()?;
     create_starship_env()?;
     Ok(())

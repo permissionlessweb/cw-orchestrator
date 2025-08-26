@@ -25,12 +25,7 @@ impl GrpcChannel {
             let uri = Uri::from_maybe_shared(address.clone()).expect("Invalid URI");
 
             let maybe_channel = Endpoint::from(uri)
-                .tls_config(
-                    ClientTlsConfig::new()
-                        .with_enabled_roots()
-                        // grpcs are http/2 by spec
-                        .assume_http2(true),
-                )
+                .tls_config(ClientTlsConfig::new().with_enabled_roots())
                 .unwrap()
                 .connect()
                 .await;

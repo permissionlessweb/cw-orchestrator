@@ -99,7 +99,7 @@ impl<Chain: CwEnv> IndexResponse for SinglePacketFlow<Chain> {
             .map(|r| r.event_attr_value(event_type, attr_key))
             .and_then(|res| res.ok())
             .or_else(|| self.outcome.event_attr_value(event_type, attr_key).ok())
-            .ok_or(StdError::generic_err(format!(
+            .ok_or(StdError::msg(format!(
                 "event of type {event_type} does not have a value at key {attr_key}"
             )))
     }
@@ -146,7 +146,7 @@ impl<Chain: CwEnv> IndexResponse for NestedPacketsFlow<Chain> {
                     .find_map(|packet_result| {
                         packet_result.event_attr_value(event_type, attr_key).ok()
                     })
-                    .ok_or(StdError::generic_err(format!(
+                    .ok_or(StdError::msg(format!(
                         "event of type {event_type} does not have a value at key {attr_key}"
                     )))
             })
@@ -295,7 +295,7 @@ pub mod success {
                 .map(|r| r.event_attr_value(event_type, attr_key))
                 .and_then(|res| res.ok())
                 .or_else(|| self.result.event_attr_value(event_type, attr_key).ok())
-                .ok_or(StdError::generic_err(format!(
+                .ok_or(StdError::msg(format!(
                     "event of type {event_type} does not have a value at key {attr_key}"
                 )))
         }
@@ -342,7 +342,7 @@ pub mod success {
                         .find_map(|packet_result| {
                             packet_result.event_attr_value(event_type, attr_key).ok()
                         })
-                        .ok_or(StdError::generic_err(format!(
+                        .ok_or(StdError::msg(format!(
                             "event of type {event_type} does not have a value at key {attr_key}"
                         )))
                 })

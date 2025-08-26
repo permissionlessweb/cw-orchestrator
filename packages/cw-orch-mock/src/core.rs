@@ -288,7 +288,7 @@ mod test {
 
     use cosmwasm_std::{
         coins, to_json_binary, Addr, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response,
-        StdResult, Uint128,
+        StdResult, Uint256,
     };
     use cw_multi_test::ContractWrapper;
     use cw_orch_core::environment::{BankQuerier, DefaultQueriers, QueryHandler};
@@ -341,7 +341,7 @@ mod test {
 
         asserting("address balance amount is correct")
             .that(&amount)
-            .is_equal_to(balance.u128());
+            .is_equal_to(balance.to_string().parse::<u128>().unwrap());
 
         asserting("sender is correct")
             .that(&sender.to_string())
@@ -375,7 +375,7 @@ mod test {
             .execute(
                 &cw20_base::msg::ExecuteMsg::Mint {
                     recipient: recipient.to_string(),
-                    amount: Uint128::from(100u128),
+                    amount: Uint256::from(100u128),
                 },
                 &[],
                 &contract_address,
@@ -419,10 +419,10 @@ mod test {
             .set_balances(&[(recipient.clone(), &[Coin::new(amount, denom)])])
             .unwrap();
 
-        let balances = chain.query_all_balances(&recipient).unwrap();
+        let balances = chain.query_balance(&recipient, denom).unwrap();
         asserting("recipient balances length is 1")
-            .that(&balances.len())
-            .is_equal_to(1);
+            .that(&balances)
+            .is_equal_to(Uint256::new(amount));
     }
 
     #[test]
@@ -466,10 +466,10 @@ mod test {
             .add_balance(&recipient, vec![Coin::new(amount, denom_2)])
             .unwrap();
 
-        let balances = chain.query_all_balances(&recipient).unwrap();
-        asserting("recipient balances added")
-            .that(&balances)
-            .contains_all_of(&[&Coin::new(amount, denom_1), &Coin::new(amount, denom_2)])
+        for denom in [denom_1, denom_2] {
+            let balance = chain.query_balance(&recipient, denom).unwrap();
+            assert_eq!(balance, Uint256::new(amount));
+        }
     }
 
     #[test]

@@ -99,6 +99,7 @@ impl<Sender: QuerySender> CosmWasmBase<Sender> {
             } else {
                 Some(contract_info.ibc_port_id)
             },
+            None,
         );
         Ok(c)
     }

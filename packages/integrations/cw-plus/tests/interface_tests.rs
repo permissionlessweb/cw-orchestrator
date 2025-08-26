@@ -228,8 +228,8 @@ mod cw4_stake {
         cw4.instantiate(
             &InstantiateMsg {
                 denom: cw20::Denom::Native("abc".to_owned()),
-                tokens_per_weight: Uint128::one(),
-                min_bond: Uint128::one(),
+                tokens_per_weight: Uint128::one().into(),
+                min_bond: Uint128::one().into(),
                 unbonding_period: cw_utils::Duration::Time(1231230000),
                 admin: None,
             },
@@ -259,7 +259,7 @@ mod cw4_stake {
 }
 
 mod cw20_base {
-    use cosmwasm_std::Uint128;
+    use cosmwasm_std::{Uint128, Uint256};
     use cw20::MinterResponse;
     use cw_orch::{mock::Mock, prelude::*};
     use cw_plus_orch::cw20_base::{
@@ -301,7 +301,7 @@ mod cw20_base {
 
         // Check new balance of user1
         let balance = cw20.balance(user1.to_string()).unwrap().balance;
-        assert_eq!(balance, Uint128::new(90));
+        assert_eq!(balance, Uint256::new(90));
 
         // Check that user2 registered
         let accounts = cw20.all_accounts(None, None).unwrap().accounts;
@@ -313,7 +313,7 @@ mod cw20_base {
 }
 
 mod cw20_ics {
-    use cosmwasm_std::{coins, to_json_binary, Uint128};
+    use cosmwasm_std::{coins, to_json_binary, Uint128, Uint256};
     use cw20::MinterResponse;
     use cw20_base::msg::InstantiateMsg;
     use cw20_ics20::{
@@ -432,9 +432,17 @@ mod cw20_ics {
         interchain
             .await_and_check_packets("juno-1", response)
             .unwrap();
+        let mut balances = Vec::new();
+        let balance1 = stargaze
+            .balance(&user_stargaze, Some("cw20".into()))
+            .unwrap();
+        balances.extend(balance1);
+        let balance2 = stargaze
+            .balance(&user_stargaze, Some("denom".into()))
+            .unwrap();
+        balances.extend(balance2);
 
-        let balance = stargaze.balance(&user_stargaze, None).unwrap();
-        assert_eq!(balance[0].amount, Uint128::new(100));
-        assert_eq!(balance[1].amount, Uint128::new(200));
+        assert_eq!(balances[0].amount, Uint256::new(100));
+        assert_eq!(balances[1].amount, Uint256::new(200));
     }
 }

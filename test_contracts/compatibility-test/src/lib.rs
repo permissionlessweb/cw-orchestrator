@@ -77,7 +77,7 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
     if msg.t.eq("success") {
         Ok(Response::new())
     } else {
-        Err(StdError::generic_err(
+        Err(StdError::msg(
             "migrate endpoint reached but no test implementation",
         ))
     }

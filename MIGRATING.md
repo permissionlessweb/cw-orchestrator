@@ -2,6 +2,32 @@
 
 This guide explains how to upgrade cw-orch in your contracts.
 
+## cw-orch-core 2.x.x -> 3.x.x (Cosmwasm 3.0)
+- Update cw-orch dependencies
+
+    ```diff
+    ```
+- Update cosmwasm dependencies
+
+    ```diff
+    ```
+- Update cosmwasm specifications dependencies
+
+
+    ```diff
+    ```
+- Update prost dependencies to 0.14.x
+
+    ```diff
+    -prost = { version = "0.13.1", default-features = false }
+    +prost = { version = "0.14.1", default-features = false }
+    ```
+- Update cosmos-sdk-proto dependency to 0.28+
+
+    ```diff
+    ```
+
+
 ## cw-orch-core 1.x.x -> 2.x.x (Cosmwasm 2.0)
 
 - Update cw-orch dependencies

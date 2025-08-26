@@ -45,14 +45,13 @@ pub(crate) mod cosmos_modules {
             vesting::v1beta1 as vesting,
         },
         cosmwasm::wasm::v1 as cosmwasm,
-        ibc::{
-            applications::transfer::v1 as ibc_transfer,
-            core::{
-                channel::v1 as ibc_channel, client::v1 as ibc_client,
-                connection::v1 as ibc_connection,
-            },
+        tendermint::abci as tendermint_abci,
+    };
+    pub use ibc_proto::ibc::{
+        applications::transfer::v1 as ibc_transfer,
+        core::{
+            channel::v1 as ibc_channel, client::v1 as ibc_client, connection::v1 as ibc_connection,
         },
-        tendermint::v0_34::abci as tendermint_abci,
     };
 }
 

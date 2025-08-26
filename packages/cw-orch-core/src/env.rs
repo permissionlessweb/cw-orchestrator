@@ -68,7 +68,7 @@ fn parse_with_log<F: FromStr<Err = E>, E: std::fmt::Display>(
     value
         .parse()
         .map_err(|e| {
-            StdError::generic_err(format!(
+            StdError::msg(format!(
                 "Couldn't parse content of env var {env_var_name}, error : {e}"
             ))
         })

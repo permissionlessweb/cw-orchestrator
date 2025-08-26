@@ -1,4 +1,4 @@
-use cosmwasm_std::IbcOrder;
+use cosmwasm_std::{IbcOrder, StdResult};
 use cw_orch_core::environment::QuerierGetter;
 use cw_orch_daemon::queriers::Ibc;
 use cw_orch_daemon::Daemon;
@@ -11,7 +11,7 @@ fn assert_ordering(
     channel: ChannelCreationResult<Daemon>,
     juno: &Daemon,
     order: IbcOrder,
-) -> anyhow::Result<()> {
+) -> StdResult<()> {
     let ibc_querier: Ibc = juno.querier();
     let channel = channel
         .interchain_channel
@@ -28,7 +28,7 @@ fn assert_ordering(
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> StdResult<()> {
     pretty_env_logger::init();
     let starship = Starship::new(None)?;
     let interchain_env = starship.interchain_env();

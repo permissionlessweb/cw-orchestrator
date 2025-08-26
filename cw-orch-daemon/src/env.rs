@@ -153,7 +153,7 @@ impl DaemonEnvVars {
 /// This happens only in rare cases
 pub fn default_state_folder() -> Result<PathBuf, StdError> {
     dirs::home_dir().map(|home| home.join(".cw-orchestrator"))
-        .ok_or( StdError::generic_err(
+        .ok_or( StdError::msg(
             format!(
                 "Your machine doesn't have a home folder. You can't use relative path for the state file such as 'state.json'. 
                 Please use an absolute path ('/home/root/state.json') or a dot-prefixed-relative path ('./state.json') in the {} env variable.",

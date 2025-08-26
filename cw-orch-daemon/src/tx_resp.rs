@@ -103,8 +103,8 @@ impl CosmTxResponse {
                         .attributes
                         .iter()
                         .map(|attr| TxResultBlockAttribute {
-                            key: parse_attribute_bytes(&attr.key),
-                            value: parse_attribute_bytes(&attr.value),
+                            key: attr.key.clone(),
+                            value: attr.value.clone(),
                         })
                         .collect(),
                 })
@@ -171,8 +171,8 @@ impl IndexResponse for CosmTxResponse {
 
             for attr in &event.attributes {
                 pattr.push(cosmwasm_std::Attribute {
-                    key: parse_attribute_bytes(&attr.key),
-                    value: parse_attribute_bytes(&attr.value.clone()),
+                    key: attr.key.clone(),
+                    value: attr.value.clone(),
                 })
             }
 
@@ -197,13 +197,13 @@ impl IndexResponse for CosmTxResponse {
             if event.r#type == event_type {
                 for attr in &event.attributes {
                     if attr.key == attr_key {
-                        return Ok(parse_attribute_bytes(&attr.value));
+                        return Ok(attr.value.clone());
                     }
                 }
             }
         }
 
-        Err(StdError::generic_err(format!(
+        Err(StdError::msg(format!(
             "event of type {event_type} does not have a value at key {attr_key}"
         )))
     }
@@ -215,7 +215,7 @@ impl IndexResponse for CosmTxResponse {
             if event.r#type == event_type {
                 for attr in &event.attributes {
                     if attr.key == attr_key {
-                        all_results.push(parse_attribute_bytes(&attr.value));
+                        all_results.push(attr.value.clone());
                     }
                 }
             }

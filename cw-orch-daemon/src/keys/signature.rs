@@ -22,9 +22,11 @@ impl Signature {
 }
 #[cfg(test)]
 mod tst {
+    use cosmwasm_std::StdResult;
+
     use super::*;
     #[test]
-    pub fn test_verify() -> anyhow::Result<()> {
+    pub fn test_verify() -> StdResult<()> {
         let secp = Secp256k1::new();
 
         let message = r#"{"account_number":"45","chain_id":"columbus-3-testnet","fee":{"amount":[{"amount":"698","denom":"uluna"}],"gas":"46467"},"memo":"","msgs":[{"type":"bank/MsgSend","value":{"amount":[{"amount":"100000000","denom":"uluna"}],"from_address":"terra1n3g37dsdlv7ryqftlkef8mhgqj4ny7p8v78lg7","to_address":"terra1wg2mlrxdmnnkkykgqg4znky86nyrtc45q336yv"}}],"sequence":"0"}"#;

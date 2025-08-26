@@ -7,7 +7,7 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn mnemonic_index() -> anyhow::Result<()> {
+    fn mnemonic_index() -> StdResult<()> {
         use cw_orch_networks::networks;
         super::common::enable_logger();
 

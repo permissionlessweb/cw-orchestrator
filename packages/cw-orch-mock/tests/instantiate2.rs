@@ -1,6 +1,7 @@
 use cosmwasm_std::instantiate2_address;
 use cosmwasm_std::Api;
 use cosmwasm_std::Binary;
+use cosmwasm_std::StdResult;
 use cw_orch_core::contract::interface_traits::ContractInstance;
 use cw_orch_core::contract::interface_traits::CwOrchInstantiate;
 use cw_orch_core::contract::interface_traits::CwOrchUpload;
@@ -12,7 +13,7 @@ use mock_contract::InstantiateMsg;
 use mock_contract::MockContract;
 
 #[test]
-fn instantiate2() -> anyhow::Result<()> {
+fn instantiate2() -> StdResult<()> {
     let app = MockBech32::new("mock");
 
     let salt = vec![12, 89, 156, 63];

@@ -46,25 +46,68 @@ impl Bank {
         denom: Option<String>,
     ) -> Result<Vec<Coin>, DaemonError> {
         use cosmos_modules::bank::query_client::QueryClient;
+        let mut all_balances = Vec::new();
+        let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
+
         match denom {
             Some(denom) => {
-                let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
-                let request = cosmos_modules::bank::QueryBalanceRequest {
-                    address: address.to_string(),
-                    denom,
-                };
-                let resp = client.balance(request).await?.into_inner();
+                let resp = client
+                    .balance(cosmos_modules::bank::QueryBalanceRequest {
+                        address: address.to_string(),
+                        denom,
+                    })
+                    .await?
+                    .into_inner();
                 let coin = resp.balance.unwrap();
                 Ok(vec![cosmrs_to_cosmwasm_coin(coin)?])
             }
             None => {
-                let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
-                let request = cosmos_modules::bank::QueryAllBalancesRequest {
-                    address: address.to_string(),
-                    ..Default::default()
-                };
-                let resp = client.all_balances(request).await?.into_inner();
-                Ok(cosmrs_to_cosmwasm_coins(resp.balances)?)
+                let mut next_key = vec![];
+                let limit = 30u64;
+                let mut max_queries = None;
+                let mut query_count = 0;
+
+                loop {
+                    let is_first_query = query_count == 0;
+                    let request = cosmos_modules::bank::QueryAllBalancesRequest {
+                        address: address.to_string(),
+                        pagination: Some(PageRequest {
+                            key: next_key.clone(),
+                            offset: 0,
+                            limit,
+                            count_total: is_first_query, // Only count on first query
+                            reverse: false,
+                        }),
+                        ..Default::default()
+                    };
+
+                    let resp = client.all_balances(request).await?.into_inner();
+                    all_balances.extend(resp.balances);
+                    query_count += 1;
+
+                    if is_first_query {
+                        if let Some(pagination_resp) = &resp.pagination {
+                            max_queries = Some((pagination_resp.total as u64 + limit - 1) / limit);
+                        }
+                    }
+
+                    if let Some(max) = max_queries {
+                        if query_count >= max {
+                            break;
+                        }
+                    }
+
+                    match resp
+                        .pagination
+                        .and_then(|p| Some(p.next_key))
+                        .filter(|key| !key.is_empty())
+                    {
+                        Some(key) => next_key = key,
+                        None => break,
+                    }
+                }
+
+                Ok(cosmrs_to_cosmwasm_coins(all_balances)?)
             }
         }
     }
@@ -189,3 +232,4 @@ impl BankQuerier for Bank {
             .block_on(self._supply_of(denom))
     }
 }
+

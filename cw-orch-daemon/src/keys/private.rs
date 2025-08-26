@@ -218,6 +218,7 @@ impl PrivateKey {
 #[cfg(test)]
 mod tst {
     use base64::{engine::general_purpose, Engine};
+    use cosmwasm_std::StdResult;
     use ethers_core::k256::ecdsa::SigningKey;
     use ethers_signers::{coins_bip39::English, MnemonicBuilder, Signer};
 
@@ -242,7 +243,7 @@ mod tst {
     }
 
     #[test]
-    pub fn tst_words() -> anyhow::Result<()> {
+    pub fn tst_words() -> StdResult<()> {
         let coin_type: u32 = 330;
         let str_1 = "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius";
         let seed_1 = "a2ae8846397b55d266af35acdbb18ba1d005f7ddbdd4ca7a804df83352eaf373f274ba0dc8ac1b2b25f19dfcb7fa8b30a240d2c6039d88963defc2f626003b2f";
@@ -258,7 +259,7 @@ mod tst {
         }
     }
     #[test]
-    pub fn tst_root_priv_key() -> anyhow::Result<()> {
+    pub fn tst_root_priv_key() -> StdResult<()> {
         let coin_type: u32 = 330;
         let str_1 = "wonder caution square unveil april art add hover spend smile proud admit modify old copper throw crew happy nature luggage reopen exhibit ordinary napkin";
         let secp = Secp256k1::new();
@@ -275,7 +276,7 @@ mod tst {
         Ok(())
     }
     #[test]
-    pub fn tst_words_to_pub() -> anyhow::Result<()> {
+    pub fn tst_words_to_pub() -> StdResult<()> {
         let str_1 = "wonder caution square unveil april art add hover spend smile proud admit modify old copper throw crew happy nature luggage reopen exhibit ordinary napkin";
         let coin_type: u32 = 330;
         let prefix = "terra";
@@ -299,7 +300,7 @@ mod tst {
 
     #[cfg(feature = "eth")]
     #[test]
-    pub fn inj() -> anyhow::Result<()> {
+    pub fn inj() -> StdResult<()> {
         let str_1: &str = "across left ignore gold echo argue track joy hire release captain enforce hotel wide flash hotel brisk joke midnight duck spare drop chronic stool";
         let coin_type: u32 = 118;
         let prefix = "juno";
@@ -325,7 +326,7 @@ mod tst {
     }
 
     // #[test]
-    // pub fn test_sign() -> anyhow::Result<()> {
+    // pub fn test_sign() -> StdResult<()> {
     //     // This test is using message from python SDK.. so these keys generate same sigs as they do.
     //     let str_1 =  "island relax shop such yellow opinion find know caught erode blue dolphin behind coach tattoo light focus snake common size analyst imitate employ walnut";
     //     let coin_type: u32 = 330;

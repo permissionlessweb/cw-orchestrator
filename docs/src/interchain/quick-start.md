@@ -86,7 +86,7 @@ impl<Chain> Uploadable for Client<Chain> {
 ```rust,ignore
 // This is used because the simple_ica_host contract doesn't have an execute endpoint defined 
 pub fn host_execute(_: DepsMut, _: Env, _: MessageInfo, _: Empty) -> StdResult<Response> {
-    Err(StdError::generic_err("Execute not implemented for host"))
+    Err(StdError::msg("Execute not implemented for host"))
 }
 
 #[interface(

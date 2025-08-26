@@ -81,13 +81,13 @@ fn raw_query<A: Api, S: StateInterface>(
         },
     ))
     .map_err(|serialize_err| {
-        StdError::generic_err(format!("Serializing QueryRequest: {serialize_err}"))
+        StdError::msg(format!("Serializing QueryRequest: {serialize_err}"))
     })?;
     let res: Result<Binary, StdError> = match querier.app.borrow().wrap().raw_query(&raw) {
-        SystemResult::Err(system_err) => Err(StdError::generic_err(format!(
+        SystemResult::Err(system_err) => Err(StdError::msg(format!(
             "Querier system error: {system_err}"
         ))),
-        SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::generic_err(format!(
+        SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::msg(format!(
             "Querier contract error: {contract_err}"
         ))),
         SystemResult::Ok(ContractResult::Ok(value)) => Ok(value),
@@ -187,14 +187,14 @@ impl<A: Api, S: StateInterface> WasmQuerier for MockWasmQuerier<A, S> {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{Addr, Binary, Empty, Response, StdError};
+    use cosmwasm_std::{Addr, Binary, Empty, Response, StdError, StdResult};
     use cw_multi_test::ContractWrapper;
     use cw_orch_core::environment::{DefaultQueriers, TxHandler, WasmQuerier};
 
     use crate::{Mock, MockBech32};
 
     #[test]
-    fn bech32_instantiate2() -> anyhow::Result<()> {
+    fn bech32_instantiate2() -> StdResult<()> {
         let mock = MockBech32::new("mock");
 
         // For this instantiate 2, we need a registered code id
@@ -217,7 +217,7 @@ mod tests {
     }
 
     #[test]
-    fn bech32_instantiate2_contract() -> anyhow::Result<()> {
+    fn bech32_instantiate2_contract() -> StdResult<()> {
         let mut mock = MockBech32::new("mock");
         mock.set_sender(Addr::unchecked(
             "mock1pgm8hyk0pvphmlvfjc8wsvk4daluz5tgrw6pu5mfpemk74uxnx9qwrtv4f",
@@ -243,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn normal_instantiate2() -> anyhow::Result<()> {
+    fn normal_instantiate2() -> StdResult<()> {
         let mock = Mock::new("sender");
 
         mock.upload_custom(

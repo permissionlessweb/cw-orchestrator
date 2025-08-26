@@ -4,7 +4,6 @@ use super::Querier;
 
 pub trait BankQuerier: Querier {
     /// Query the bank balance of a given address
-    /// If denom is None, returns all balances
     fn balance(&self, address: &Addr, denom: Option<String>) -> Result<Vec<Coin>, Self::Error>;
 
     /// Query total supply in the bank

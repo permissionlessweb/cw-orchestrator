@@ -59,7 +59,7 @@ pub fn execute(
 pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::FirstQuery {} => to_json_binary("first query passed"),
-        QueryMsg::SecondQuery { .. } => Err(StdError::generic_err("Query not available")),
+        QueryMsg::SecondQuery { .. } => Err(StdError::msg("Query not available")),
     }
 }
 
@@ -67,9 +67,7 @@ pub fn migrate(_deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response
     if msg.t.eq("success") {
         Ok(Response::new())
     } else {
-        Err(StdError::generic_err(
-            "migrate endpoint reached but no test implementation",
-        ))
+        Err(StdError::msg("migrate endpoint reached but no test implementation"))
     }
 }
 

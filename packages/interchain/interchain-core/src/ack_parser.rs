@@ -26,8 +26,10 @@ impl IbcAckParser {
         if let Ok(decoded_polytone_packet) = decoded_polytone_packet {
             match &decoded_polytone_packet {
                 Callback::Query(query_result) => match query_result {
-                    Ok(_) => return Ok(decoded_polytone_packet),
-                    Err(e) => {
+                    polytone_callback::QueryResult::Success(_) => {
+                        return Ok(decoded_polytone_packet)
+                    }
+                    polytone_callback::QueryResult::Error(e) => {
                         return Err(InterchainError::FailedAckReceived(format!(
                             "Error during query on remote chain : {:?}",
                             e
@@ -35,8 +37,10 @@ impl IbcAckParser {
                     }
                 },
                 Callback::Execute(execute_response) => match execute_response {
-                    Ok(_) => return Ok(decoded_polytone_packet),
-                    Err(e) => {
+                    polytone_callback::ExecutionResult::Success(_) => {
+                        return Ok(decoded_polytone_packet)
+                    }
+                    polytone_callback::ExecutionResult::Error(e) => {
                         return Err(InterchainError::FailedAckReceived(format!(
                             "Error during execution on remote chain : {}",
                             e
@@ -222,6 +226,20 @@ pub mod polytone_callback {
         pub error: String,
     }
 
+    /// Wrapper for query results to work with cosmwasm-schema 3.0
+    #[cw_serde]
+    pub enum QueryResult {
+        Success(Vec<Binary>),
+        Error(ErrorResponse),
+    }
+
+    /// Wrapper for execution results to work with cosmwasm-schema 3.0
+    #[cw_serde]
+    pub enum ExecutionResult {
+        Success(ExecutionResponse),
+        Error(String),
+    }
+
     /// Copy of the [polytone::ack::Callback](https://docs.rs/polytone/1.0.0/polytone/ack/index.html#reexport.Callback)
     /// But without cosmwasm v1 dependencies
     #[cw_serde]
@@ -230,7 +248,7 @@ pub mod polytone_callback {
         ///
         /// result[i] corresponds to the i'th query and contains the
         /// base64 encoded query response.
-        Query(Result<Vec<Binary>, ErrorResponse>),
+        Query(QueryResult),
 
         /// Result of executing the requested messages, or an error.
         ///
@@ -240,7 +258,7 @@ pub mod polytone_callback {
         /// error string will only tell you the error's codespace. for
         /// example, an out-of-gas error is code 11 and looks like
         /// `codespace: sdk, code: 11`.
-        Execute(Result<ExecutionResponse, String>),
+        Execute(ExecutionResult),
 
         /// An error occured that could not be recovered from. The only
         /// known way that this can occur is message handling running out
@@ -257,12 +275,12 @@ pub mod polytone_callback {
 
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::Binary;
+    use cosmwasm_std::{Binary, StdResult};
 
     use super::IbcAckParser;
 
     #[test]
-    fn ics20_ack_test() -> cw_orch::anyhow::Result<()> {
+    fn ics20_ack_test() -> StdResult<()> {
         let success_ack = Binary::from_base64("AQ==")?;
 
         IbcAckParser::ics20_ack(&success_ack)?;

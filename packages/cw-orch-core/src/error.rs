@@ -6,7 +6,7 @@ use std::{
     str::ParseBoolError,
 };
 
-use cosmwasm_std::Instantiate2AddressError;
+use cosmwasm_std::{Instantiate2AddressError, OverflowError, StdError, StdResult};
 use thiserror::Error;
 
 /// cw-orchestrator error wrapper using thiserror.
@@ -24,6 +24,8 @@ pub enum CwEnvError {
     SerdeJson(#[from] ::serde_json::Error),
     #[error(transparent)]
     EnvvarError(#[from] env::VarError),
+    #[error(transparent)]
+    OverflowError(#[from] OverflowError),
     #[error(transparent)]
     ParseFloatError(#[from] ParseFloatError),
     #[error(transparent)]
@@ -54,12 +56,12 @@ impl CwEnvError {
         }
     }
 
-    pub fn downcast<E>(self) -> anyhow::Result<E>
+    pub fn downcast<E>(self) -> StdResult<E>
     where
         E: std::fmt::Display + std::fmt::Debug + Send + Sync + 'static,
     {
         match self {
-            CwEnvError::AnyError(e) => e.downcast(),
+            CwEnvError::AnyError(e) => Err(StdError::msg(e.to_string())),
             _ => panic!("Unexpected error type"),
         }
     }

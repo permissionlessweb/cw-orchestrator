@@ -90,7 +90,7 @@ impl IndexResponse for AppResponse {
                 }
             }
         }
-        Err(StdError::generic_err(format!(
+        Err(StdError::msg(format!(
             "missing combination (event: {}, attribute: {})",
             event_type, attr_key
         )))
@@ -114,7 +114,7 @@ impl IndexResponse for AppResponse {
 
 #[cfg(test)]
 mod index_response_test {
-    use cosmwasm_std::{Addr, Event};
+    use cosmwasm_std::{Addr, Event, StdResult};
     use cw_multi_test::AppResponse;
 
     use speculoos::prelude::*;
@@ -124,7 +124,7 @@ mod index_response_test {
     const CONTRACT_ADDRESS: &str =
         "cosmos1fd68ah02gr2y8ze7tm9te7m70zlmc7vjyyhs6xlhsdmqqcjud4dql4wpxr";
 
-    fn test_events(idxres: &dyn IndexResponse) -> anyhow::Result<()> {
+    fn test_events(idxres: &dyn IndexResponse) -> StdResult<()> {
         asserting!("events length is 1")
             .that(&idxres.events().len())
             .is_equal_to(2);
@@ -132,13 +132,13 @@ mod index_response_test {
         Ok(())
     }
 
-    fn test_data(idxres: &dyn IndexResponse) -> anyhow::Result<()> {
+    fn test_data(idxres: &dyn IndexResponse) -> StdResult<()> {
         asserting!("data is None").that(&idxres.data()).is_none();
 
         Ok(())
     }
 
-    fn test_uploaded_code_id(idxres: &dyn IndexResponse) -> anyhow::Result<()> {
+    fn test_uploaded_code_id(idxres: &dyn IndexResponse) -> StdResult<()> {
         asserting!("uploaded code_id is 1")
             .that(&idxres.uploaded_code_id()?)
             .is_equal_to(1u64);
@@ -146,7 +146,7 @@ mod index_response_test {
         Ok(())
     }
 
-    fn test_instantiated_contract_address(idxres: &dyn IndexResponse) -> anyhow::Result<()> {
+    fn test_instantiated_contract_address(idxres: &dyn IndexResponse) -> StdResult<()> {
         asserting!("instantiated contract_address is ")
             .that(&idxres.instantiated_contract_address()?)
             .is_equal_to(Addr::unchecked(CONTRACT_ADDRESS));

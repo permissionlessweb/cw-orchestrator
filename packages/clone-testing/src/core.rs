@@ -6,8 +6,8 @@ use clone_cw_multi_test::{
     App, AppBuilder, BankKeeper, Contract, Executor, WasmKeeper,
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Empty, Event, StdError, StdResult,
-    Uint128, WasmMsg,
+    coin, to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Empty, Event, StdError,
+    StdResult, Uint256, WasmMsg,
 };
 use cw_orch_core::{
     contract::interface_traits::{ContractInstance, Uploadable},
@@ -95,19 +95,25 @@ impl CloneTesting {
     }
 
     /// Adds the bank balance of an address.
+    /// Adds the bank balance of an address.
     pub fn add_balance(
         &self,
         address: &Addr,
         amount: Vec<cosmwasm_std::Coin>,
     ) -> Result<(), CwEnvError> {
-        let b = self.query_all_balances(address)?;
+        let addr = &address;
+        let mut b = Vec::new();
+        for a in &amount {
+            let am = self.query_balance(addr, &a.denom)?;
+            b.push(coin(am.to_string().parse()?, a.denom.clone()));
+        }
         let new_amount = NativeBalance(b) + NativeBalance(amount);
         self.app
             .borrow_mut()
             .init_modules(|router, _, storage| {
                 router
                     .bank
-                    .init_balance(storage, address, new_amount.into_vec())
+                    .init_balance(storage, addr, new_amount.into_vec())
             })
             .map_err(Into::into)
     }
@@ -129,19 +135,11 @@ impl CloneTesting {
 
     /// Query the (bank) balance of a native token for and address.
     /// Returns the amount of the native token.
-    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint128, CwEnvError> {
+    pub fn query_balance(&self, address: &Addr, denom: &str) -> Result<Uint256, CwEnvError> {
         Ok(self
             .bank_querier()
             .balance(address, Some(denom.to_string()))?[0]
             .amount)
-    }
-
-    /// Fetch all the balances of an address.
-    pub fn query_all_balances(
-        &self,
-        address: &Addr,
-    ) -> Result<Vec<cosmwasm_std::Coin>, CwEnvError> {
-        self.bank_querier().balance(address, None)
     }
 
     pub fn upload_wasm<T: Uploadable + ContractInstance<CloneTesting>>(
@@ -476,7 +474,7 @@ impl IndexResponse for AppResponse {
                 }
             }
         }
-        Err(StdError::generic_err(format!(
+        Err(StdError::msg(format!(
             "missing combination (event: {}, attribute: {})",
             event_type, attr_key
         )))
@@ -544,7 +542,7 @@ mod test {
         match msg {
             cw20_base::msg::QueryMsg::Balance { address: _ } => {
                 Ok(to_json_binary::<BalanceResponse>(&BalanceResponse {
-                    balance: Uint128::from(100u128),
+                    balance: Uint128::from(100u128).into(),
                 })
                 .unwrap())
             }
@@ -565,7 +563,7 @@ mod test {
     }
 
     #[test]
-    fn mock() -> anyhow::Result<()> {
+    fn mock() -> StdResult<()> {
         let amount = 1000000u128;
         let denom = "uosmo";
         let chain_info = JUNO_1;
@@ -582,7 +580,7 @@ mod test {
 
         asserting("address balance amount is correct")
             .that(&amount)
-            .is_equal_to(balance.u128());
+            .is_equal_to(balance.to_string().parse::<u128>()?);
 
         asserting("sender is correct")
             .that(&sender)
@@ -615,7 +613,7 @@ mod test {
             .execute(
                 &cw20_base::msg::ExecuteMsg::Mint {
                     recipient: recipient.to_string(),
-                    amount: Uint128::from(100u128),
+                    amount: Uint128::from(100u128).into(),
                 },
                 &[],
                 &contract_address,
@@ -637,7 +635,7 @@ mod test {
 
         asserting("that query passed on correctly")
             .that(&query_res.balance)
-            .is_equal_to(Uint128::from(100u128));
+            .is_equal_to(Uint256::from(100u128));
 
         let migration_res = chain.migrate(&Empty {}, code_id, &contract_address);
         asserting("that migration passed on correctly")
@@ -648,7 +646,7 @@ mod test {
     }
 
     #[test]
-    fn custom_mock_env() -> anyhow::Result<()> {
+    fn custom_mock_env() -> StdResult<()> {
         let amount = 1000000u128;
         let denom = "uosmo";
         let chain = JUNO_1;
@@ -663,10 +661,10 @@ mod test {
             .set_balances(&[(&recipient, &[Coin::new(amount, denom)])])
             .unwrap();
 
-        let balances = chain.query_all_balances(&recipient).unwrap();
-        asserting("recipient balances length is 1")
-            .that(&balances.len())
-            .is_equal_to(1);
+        let balance = chain.query_balance(&recipient, denom)?;
+        asserting(&format!("recipient balance for denom {}", denom))
+            .that(&balance)
+            .is_equal_to(Uint256::new(amount));
 
         Ok(())
     }
@@ -698,26 +696,29 @@ mod test {
     }
 
     #[test]
-    fn add_balance() -> anyhow::Result<()> {
+    fn add_balance() -> StdResult<()> {
         let amount = 1000000u128;
-        let denom_1 = "uosmo";
-        let denom_2 = "osmou";
+        let denoms = ["uosmo", "osmou"];
         let chain_info = JUNO_1;
 
         let chain = CloneTesting::new(chain_info)?;
         let recipient = &chain.init_account();
 
-        chain
-            .add_balance(recipient, vec![Coin::new(amount, denom_1)])
-            .unwrap();
-        chain
-            .add_balance(recipient, vec![Coin::new(amount, denom_2)])
-            .unwrap();
+        // Send both denoms at once
+        let coins = denoms
+            .iter()
+            .map(|denom| Coin::new(amount, *denom))
+            .collect::<Vec<_>>();
+        chain.add_balance(recipient, coins).unwrap();
 
-        let balances = chain.query_all_balances(recipient).unwrap();
-        asserting("recipient balances added")
-            .that(&balances)
-            .contains_all_of(&[&Coin::new(amount, denom_1), &Coin::new(amount, denom_2)]);
+        // Check balance for each denom
+        for denom in denoms {
+            let balance = chain.query_balance(recipient, denom)?;
+            asserting(&format!("recipient balance for denom {}", denom))
+                .that(&balance)
+                .is_equal_to(Uint256::new(amount));
+        }
+
         Ok(())
     }
 }

@@ -45,8 +45,7 @@ impl BankQuerier for CloneBankQuerier {
                 .amount;
             Ok(vec![Coin { amount, denom }])
         } else {
-            let amount = self.app.borrow().wrap().query_all_balances(address)?;
-            Ok(amount)
+            Err(CwEnvError::StdErr("you must provide a coin denomination to query a balance for. We currently cannot query for all of the uses balances, due to support of this function being removed in cosmwasm@v3.0.0".into()))
         }
     }
 

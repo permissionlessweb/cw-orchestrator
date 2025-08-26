@@ -30,7 +30,7 @@ interchain.await_and_check_packets(
 ```
 
 This namely removes the need for pausing the program and resuming manually or with a timer.
-This also allows to automatically get extra information about the relayed packet and assert the IBC-cycle ended successfully.
+This also allows to automatically get extra information about the relayed packet and assert the IBC-cycle ended successfuly.
 
 ## Interchain packet following
 
@@ -40,7 +40,7 @@ This is mostly useful for packet analysis of certain channels, ports or connecti
 
 ```rust,ignore
 # use cw_orch_interchain::InterchainEnv;
-# fn main() -> anyhow::Result<()>{
+# fn main() -> StdResult<()>{
     # let interchain = cw_orch_interchain::MockInterchainEnv::new(vec![]);    
     # #[allow(unused)]
     let packet_lifetime = interchain.await_single_packet(

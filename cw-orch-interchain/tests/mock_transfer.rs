@@ -1,4 +1,4 @@
-use cosmwasm_std::{coin, CosmosMsg, IbcMsg, IbcTimeout, IbcTimeoutBlock};
+use cosmwasm_std::{coin, CosmosMsg, IbcMsg, IbcTimeout, IbcTimeoutBlock, StdResult};
 use cw_orch::{
     environment::{QueryHandler, TxHandler},
     mock::cw_multi_test::Executor,
@@ -8,7 +8,7 @@ use cw_orch_interchain_mock::MockInterchainEnv;
 use ibc_relayer_types::core::ics24_host::identifier::PortId;
 
 #[test]
-fn mock_transfer() -> cw_orch::anyhow::Result<()> {
+fn mock_transfer() -> StdResult<()> {
     pretty_env_logger::init();
 
     let interchain = MockInterchainEnv::new(vec![("juno-1", "sender"), ("stargaze-1", "sender")]);

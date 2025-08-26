@@ -204,7 +204,7 @@ error[E0432]: unresolved import `cw_orch::prelude`
 error[E0432]: unresolved import `cw_orch::anyhow`
   --> contracts/counter/src/interface.rs:38:14
    |
-38 | use cw_orch::anyhow::Result;
+38 | use StdResult;
    |              ^^^^^^ could not find `anyhow` in `cw_orch`
 
 error: cannot find macro `artifacts_dir_from_workspace` in this scope

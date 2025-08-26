@@ -33,7 +33,7 @@ In order to unit-test that logic, you may want to test against actual on-chain d
 
 ```rust,ignore
 #[test]
-fn balance_is_available() -> anyhow::Result<()>{
+fn balance_is_available() -> StdResult<()>{
     let deps = cw_orch::prelude::live_mock::mock_dependencies(JUNO_1);
 
     // assert the query is successful

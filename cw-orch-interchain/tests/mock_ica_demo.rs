@@ -1,7 +1,7 @@
 use cw_orch_interchain_core::InterchainEnv;
 use cw_orch_interchain_mock::MockInterchainEnv;
 mod common;
-use cosmwasm_std::coins;
+use cosmwasm_std::{coins, StdResult};
 use cw_orch::prelude::*;
 
 pub fn logger_test_init() {
@@ -13,7 +13,7 @@ pub const OSMOSIS: &str = "osmosis-1";
 pub const JUNO_FUNDS_DENOM: &str = "ujuno";
 
 #[test]
-fn mock_ica_demo() -> cw_orch::anyhow::Result<()> {
+fn mock_ica_demo() -> StdResult<()> {
     // logger_test_init();
     env_logger::init();
     let common_sender = "sender";

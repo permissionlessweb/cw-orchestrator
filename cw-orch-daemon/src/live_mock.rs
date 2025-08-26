@@ -7,16 +7,16 @@ use crate::queriers::Staking;
 use crate::RUNTIME;
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::Addr;
-use cosmwasm_std::AllBalanceResponse;
 use cosmwasm_std::BalanceResponse;
 use cosmwasm_std::BankQuery;
 use cosmwasm_std::Binary;
 use cosmwasm_std::Delegation;
 use cosmwasm_std::Empty;
 use cosmwasm_std::StakingQuery;
+use cosmwasm_std::Uint256;
 use cosmwasm_std::{
     from_json, to_json_binary, Coin, ContractResult, OwnedDeps, Querier, QuerierResult,
-    QueryRequest, SystemError, SystemResult, Uint128, WasmQuery,
+    QueryRequest, SystemError, SystemResult, WasmQuery,
 };
 use cosmwasm_std::{AllDelegationsResponse, BondedDenomResponse};
 use cw_orch_core::environment::BankQuerier;
@@ -30,7 +30,7 @@ use crate::channel::GrpcChannel;
 
 fn to_cosmwasm_coin(c: cosmrs::proto::cosmos::base::v1beta1::Coin) -> Coin {
     Coin {
-        amount: Uint128::from_str(&c.amount).unwrap(),
+        amount: Uint256::from_str(&c.amount).unwrap(),
         denom: c.denom,
     }
 }
@@ -122,14 +122,6 @@ impl WasmMockQuerier {
                             });
                         SystemResult::Ok(ContractResult::from(query_result))
                     }
-                    BankQuery::AllBalances { address } => {
-                        let query_result = querier
-                            .balance(&Addr::unchecked(address), None)
-                            .map(AllBalanceResponse::new)
-                            .map(|query_result| to_json_binary(&query_result))
-                            .unwrap();
-                        SystemResult::Ok(ContractResult::from(query_result))
-                    }
                     _ => SystemResult::Err(SystemError::InvalidRequest {
                         error: QUERIER_ERROR.to_string(),
                         request: to_json_binary(&request).unwrap(),
@@ -205,13 +197,15 @@ impl WasmMockQuerier {
 #[cfg(test)]
 mod tests {
 
+    use cosmwasm_std::StdError;
+
     use super::*;
     use crate::networks::JUNO_1;
 
     use super::mock_dependencies;
 
     #[test]
-    fn bank_balance_querier() -> Result<(), anyhow::Error> {
+    fn bank_balance_querier() -> Result<(), StdError> {
         let address = "juno1rkhrfuq7k2k68k0hctrmv8efyxul6tgn8hny6y";
 
         let deps = mock_dependencies(JUNO_1.into());
@@ -228,19 +222,19 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn bank_all_balances_querier() -> Result<(), anyhow::Error> {
-        let address = "juno1rkhrfuq7k2k68k0hctrmv8efyxul6tgn8hny6y";
+    // #[test]
+    // fn bank_all_balances_querier() -> Result<(), anyhow::Error> {
+    //     let address = "juno1rkhrfuq7k2k68k0hctrmv8efyxul6tgn8hny6y";
 
-        let deps = mock_dependencies(JUNO_1.into());
-        let deps_ref = deps.as_ref();
-        let _response: AllBalanceResponse =
-            deps_ref
-                .querier
-                .query(&QueryRequest::Bank(BankQuery::AllBalances {
-                    address: address.to_string(),
-                }))?;
-        // We can't really test that response, but it has to unwrap at least !
-        Ok(())
-    }
+    //     let deps = mock_dependencies(JUNO_1.into());
+    //     let deps_ref = deps.as_ref();
+    //     let _response: AllBalanceResponse =
+    //         deps_ref
+    //             .querier
+    //             .query(&QueryRequest::Bank(BankQuery::AllBalances {
+    //                 address: address.to_string(),
+    //             }))?;
+    //     // We can't really test that response, but it has to unwrap at least !
+    //     Ok(())
+    // }
 }
