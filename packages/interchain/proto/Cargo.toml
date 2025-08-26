@@ -20,11 +20,12 @@ cosmwasm-std      = { workspace = true }
 ibc-proto         = { workspace = true }
 ibc-relayer-types = { workspace = true }
 log               = { workspace = true }
-osmosis-std       = { version = "0.26.0" , path = "../../../../osmosis-rust/packages/osmosis-std"}
 prost             = { workspace = true }
 prost-types       = { workspace = true }
 tokio             = { workspace = true }
 tonic             = { workspace = true }
+
+osmosis-std       = { version = "0.26.0" , git = "https://github.com/permissionlessweb/osmosis-rust" }
 
 [dev-dependencies]
 cw-orch-interchain-daemon = { workspace = true }

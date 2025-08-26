@@ -38,7 +38,7 @@ cw20             = { version = "3.0.0", git = "https://github.com/permissionless
 cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus", branch = "bump/v3" }
 
 neutron-test-tube = { package = "neutron-test-tube",version = "5.1.3", git = "https://github.com/permissionlessweb/neutron-test-tube" }
-osmosis-test-tube = { version = "25.0.0", path = "../osmosis-test-tube/packages/osmosis-test-tube" }
+osmosis-test-tube = { version = "25.0.0", git = "https://github.com/permissionlessweb/osmosis-test-tube" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
