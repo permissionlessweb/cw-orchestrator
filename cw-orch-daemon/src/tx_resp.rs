@@ -18,9 +18,9 @@ const FORMAT_TZ_SUPPLIED: &str = "%Y-%m-%dT%H:%M:%S.%f%:z";
 const FORMAT_SHORT_Z: &str = "%Y-%m-%dT%H:%M:%SZ";
 const FORMAT_SHORT_Z2: &str = "%Y-%m-%dT%H:%M:%S.%fZ";
 
-fn parse_attribute_bytes(value: &Bytes) -> String {
-    String::from_utf8_lossy(value).to_string()
-}
+// fn parse_attribute_bytes(value: &Bytes) -> String {
+//     String::from_utf8_lossy(value).to_string()
+// }
 
 /// The response from a transaction performed on a blockchain.
 #[derive(Debug, Default, Clone)]

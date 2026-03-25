@@ -2,14 +2,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cosmwasm_std::testing::MockApi;
-use cosmwasm_std::{coin, Addr, Coin, Uint256};
-use cw_multi_test::AppBuilder;
+use cosmwasm_std::{Addr, Coin, Uint256};
+use cw_multi_test::{AppBuilder, BankSudo, SudoMsg};
 use cw_orch_core::environment::{BankQuerier, BankSetter, TxHandler};
 use cw_orch_core::{
     environment::{DefaultQueriers, StateInterface},
     CwEnvError,
 };
-use cw_utils::NativeBalance;
 
 use crate::queriers::bank::MockBankQuerier;
 use crate::{Mock, MockState};
@@ -33,20 +32,13 @@ impl<S: StateInterface> Mock<S> {
         address: &Addr,
         amount: Vec<cosmwasm_std::Coin>,
     ) -> Result<(), CwEnvError> {
-        let addr = &address;
-        let mut b = Vec::new();
-        for a in &amount {
-            let am = self.query_balance(addr, &a.denom)?;
-            b.push(coin(am.to_string().parse()?, a.denom.clone()));
-        }
-        let new_amount = NativeBalance(b) + NativeBalance(amount);
         self.app
             .borrow_mut()
-            .init_modules(|router, _, storage| {
-                router
-                    .bank
-                    .init_balance(storage, addr, new_amount.into_vec())
-            })
+            .sudo(SudoMsg::Bank(BankSudo::Mint {
+                to_address: address.to_string(),
+                amount,
+            }))
+            .map(|_| ())
             .map_err(Into::into)
     }
 

@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, MigrateInfo, Response, StdResult, to_json_binary};
 use cw_orch::prelude::*;
 use msg::{
     execute::{BaseExecMsg, BaseExecMsgFns as _, MintingExecMsg, MintingExecMsgFns as _},
@@ -69,7 +69,7 @@ pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: Empty) -> StdResult<Response> {
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: Empty, _info: MigrateInfo) -> StdResult<Response> {
     Ok(Response::new())
 }
 

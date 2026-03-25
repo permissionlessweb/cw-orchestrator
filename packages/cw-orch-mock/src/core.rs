@@ -43,7 +43,7 @@ pub type MockApp<A = MockApi> = App<
 ///
 /// ## Example
 /// ```
-/// # use cosmwasm_std::{Addr, coin, Uint128};
+/// # use cosmwasm_std::{Addr, coin, Uint256};
 /// use cw_orch_mock::Mock;
 /// use cw_orch_core::environment::TxHandler;
 ///
@@ -53,8 +53,8 @@ pub type MockApp<A = MockApi> = App<
 /// mock.set_balance(&mock.sender_addr(), vec![coin(100u128, "token")]).unwrap();
 ///
 /// // query the balance
-/// let balance: Uint128 = mock.query_balance(&mock.sender_addr(), "token").unwrap();
-/// assert_eq!(balance.u128(), 100u128);
+/// let balance: Uint256 = mock.query_balance(&mock.sender_addr(), "token").unwrap();
+/// assert_eq!(balance, Uint256::new(100u128));
 /// ```
 ///
 /// ## Example with custom state

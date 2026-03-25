@@ -5,6 +5,6 @@ snapshot_kind: text
 ---
 counter_contract:
   - - contract_info
-    - "{\"contract\":\"crates.io:counter\",\"version\":\"0.27.1\"}"
+    - "{\"contract\":\"crates.io:counter\",\"version\":\"0.30.0\"}"
   - - state
     - "{\"count\":1,\"owner\":\"cosmwasm1pgm8hyk0pvphmlvfjc8wsvk4daluz5tgrw6pu5mfpemk74uxnx9qlm3aqg\"}"

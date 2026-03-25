@@ -20,7 +20,7 @@ cosmwasm-std    = { workspace = true }
 cw-orch         = { workspace = true, features = ["daemon"] }
 cw-storage-plus = { workspace = true }
 cw2             = "3.0"
-schemars = "0.8.4"
+schemars = "0.8"
 serde           = { workspace = true }
 serde_json      = "1.0.125"
 thiserror       = { version = "1.0.63" }

@@ -24,3 +24,5 @@ gen_cov_test
 docs/book
 
 packages/integrations/**/artifacts
+crates/core-cosmwasm
+crates/terp-account-billboards

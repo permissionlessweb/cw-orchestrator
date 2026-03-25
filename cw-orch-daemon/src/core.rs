@@ -9,7 +9,6 @@ use crate::{
 use cosmrs::{
     cosmwasm::{MsgExecuteContract, MsgInstantiateContract, MsgMigrateContract},
     proto::cosmwasm::wasm::v1::MsgInstantiateContract2,
-    tendermint::Time,
     AccountId, Any, Denom,
 };
 use cosmwasm_std::{Addr, Binary, Coin};

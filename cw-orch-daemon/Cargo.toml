@@ -31,7 +31,7 @@ cw-orch-traits   = { workspace = true }
 anyhow       = { workspace = true }
 cosmwasm-std = { workspace = true }
 log          = { workspace = true }
-schemars = "0.8.4"
+schemars = "0.8"
 serde        = { workspace = true }
 serde_json   = { workspace = true }
 thiserror    = { workspace = true }
@@ -81,12 +81,14 @@ libc-print = "0.1.23"
 toml       = "0.8"
 
 [dev-dependencies]
+cw20             = { path = "../../cw-plus/packages/cw20" }
+cw20-base        = { path = "../../cw-plus/contracts/cw20-base" }
+
 cosmwasm-schema = "3.0.1"
 ctor            = "0.2.8"
 cw-orch         = { path = "../cw-orch", features = ["daemon"] }
 cw-orch-daemon  = { path = "." }
-cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
-cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
+
 duct            = "0.13"
 env_logger      = "0.11.5"
 mock-contract   = { path = "../contracts-ws/contracts/mock_contract", features = ["interface"] }
