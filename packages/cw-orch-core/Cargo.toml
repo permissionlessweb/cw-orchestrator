@@ -19,6 +19,7 @@ all-features = true
 [features]
 default = []
 eth     = ["dep:snailquote"]
+terp    = []
 
 [dependencies]
 cosmwasm-std  = { workspace = true }

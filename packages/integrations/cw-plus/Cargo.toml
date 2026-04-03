@@ -16,18 +16,18 @@ cosmwasm-std    = { workspace = true }
 cw-utils        = { workspace = true }
 
 
-cw-controllers     = { package = "cw-controllers", path = "../../../../cw-minus/packages/controllers" }
-cw1                = { package = "cw1", path = "../../../../cw-plus/packages/cw1" }
+cw-controllers     = { path = "../../../../cw-minus/packages/controllers" }
+cw1                = { path = "../../../../cw-plus/packages/cw1" }
 cw1-subkeys        = { package = "cw1-subkeys", path = "../../../../cw-plus/contracts/cw1-subkeys", features = ["library"] }
-cw1-whitelist      = { package = "cw1-whitelist", path = "../../../../cw-plus/contracts/cw1-whitelist", features = ["library"] }
-cw20               = { package = "cw20", path = "../../../../cw-plus/packages/cw20" }
-cw20-base          = { package = "cw20-base", path = "../../../../cw-plus/contracts/cw20-base", features = ["library"] }
-cw20-ics20         = { path = "../../../../cw-plus/contracts/cw20-ics20", features = ["library"] }
+cw1-whitelist      = { path = "../../../../cw-plus/contracts/cw1-whitelist" }
+cw20               = { path = "../../../../cw-plus/packages/cw20" }
+cw20-base          = { path = "../../../../cw-plus/contracts/cw20-base" }
+cw20-ics20         = { path = "../../../../cw-plus/contracts/cw20-ics20" }
 cw3                = { path = "../../../../cw-plus/packages/cw3" }
 cw3-fixed-multisig = { path = "../../../../cw-plus/contracts/cw3-fixed-multisig", features = ["library"] }
 cw3-flex-multisig  = { path = "../../../../cw-plus/contracts/cw3-flex-multisig", features = ["library"] }
 cw4                = { path = "../../../../cw-plus/packages/cw4" }
-cw4-group          = { path = "../../../../cw-plus/contracts/cw4-group", features = ["library"] }
+cw4-group          = { path = "../../../../cw-plus/contracts/cw4-group" }
 cw4-stake          = { path = "../../../../cw-plus/contracts/cw4-stake", features = ["library"] }
 
 cw-orch-from-interface-derive = { version = "0.1.0", path = "../../macros/from-interface-derive" }
