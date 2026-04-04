@@ -27,33 +27,33 @@ license    = "LGPL-3.0"
 repository = "https://github.com/AbstractSDK/cw-orchestrator"
 
 [workspace.dependencies]
-cosmwasm-std     = { version = "3.0.4" }
-cw-storage-plus  = { version = "3.0.1" }
+cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
+cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "mvp" }
 
-cw-multi-test = { package = "abstract-cw-multi-test", path = "../cw-multi-test-fork" }
-cosmos-sdk-proto  = { path = "../cosmos-rust/cosmos-sdk-proto" }
-cw20 = { path = "../cw-plus/packages/cw20" }
-cw20-base = { path = "../cw-plus/contracts/cw20-base" }
-cw-utils = { path = "../cw-minus/packages/cw-utils" }
-neutron-test-tube = { path = "../neutron-test-tube/packages/neutron-test-tube" }
-osmosis-test-tube = { path = "../osmosis-test-tube/packages/osmosis-test-tube" }
-cosmrs  = { path = "../cosmos-rust/cosmrs" }
-ibc-proto   = { path = "../ibc-proto-rs" }
-clone-cw-multi-test = { path = "../clone-cw-multi-test" }
-osmosis-std = { path = "../osmosis-rust/packages/osmosis-std" }
-neutron-std = { path = "../neutron-std/packages/neutron-std" }
-simple-ica = { path = "../cw-ibc-demo/packages/simple-ica" }
-simple-ica-controller = { path = "../cw-ibc-demo/contracts/simple-ica-controller" }
-simple-ica-host = { path = "../cw-ibc-demo/contracts/simple-ica-host" }
-tendermint       = { path = "../tendermint-rs/tendermint" }
-tendermint-proto = { path = "../tendermint-rs/proto" }
-tendermint-rpc   = { path = "../tendermint-rs/rpc" }
+cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test", branch = "mvp" }
+cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main" }
+cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
+cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
+cw-utils = { git = "https://github.com/permissionlessweb/cw-minus", branch = "main" }
+neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-tube", branch = "main" }
+osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "main" }
+cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main" }
+ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "main" }
+clone-cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "cw3/adapt_for_local_execution" }
+osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "main" }
+neutron-std = { git = "https://github.com/permissionlessweb/neutron-std", branch = "feat/cw3" }
+simple-ica = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
+simple-ica-controller = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
+simple-ica-host = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
+tendermint = { git = "https://github.com/permissionlessweb/tendermint-rs", branch = "main" }
+tendermint-proto = { git = "https://github.com/permissionlessweb/tendermint-rs", branch = "main" }
+tendermint-rpc = { git = "https://github.com/permissionlessweb/tendermint-rs", branch = "main" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
 tokio  = { version = "1.39", features = ["full"] }
 
-cw-orch          = { path = "./cw-orch" }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "main" }
 cw-orch-core     = { path = "packages/cw-orch-core" }
 cw-orch-daemon   = { path = "./cw-orch-daemon" }
 cw-orch-mock     = { path = "packages/cw-orch-mock" }

@@ -25,7 +25,7 @@ prost-types       = { workspace = true }
 tokio             = { workspace = true }
 tonic             = { workspace = true }
 
-osmosis-std      = { path = "../../../../osmosis-rust/packages/osmosis-std" }
+osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "main" }
 
 [dev-dependencies]
 cw-orch-interchain-daemon = { workspace = true }
