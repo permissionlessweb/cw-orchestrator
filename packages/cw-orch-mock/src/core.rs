@@ -5,8 +5,8 @@ use cosmwasm_std::{
     to_json_binary, Addr, Api, BankMsg, Binary, CosmosMsg, Empty, Event, WasmMsg,
 };
 use cw_multi_test::{
-    ibc::IbcSimpleModule, App, AppResponse, BankKeeper, Contract, DistributionKeeper, Executor,
-    FailingModule, GovFailingModule, MockApiBech32, StakeKeeper, StargateFailing, WasmKeeper,
+    App, AppResponse, BankKeeper, Contract, DistributionKeeper, Executor, FailingModule,
+    GovFailingModule, IbcSimpleModule, MockApiBech32, StakeKeeper, StargateFailing, WasmKeeper,
 };
 use serde::Serialize;
 
