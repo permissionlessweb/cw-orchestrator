@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use cosmwasm_std::{testing::MockApi, Addr, Coin, Uint256};
-use cw_multi_test::{AppBuilder, BankSudo, MockApiBech32, SudoMsg};
+use cw_multi_test::{AppBuilder, BankSudo, IbcSimpleModule, MockApiBech32, SudoMsg};
 use cw_orch_core::{
     environment::{BankQuerier, BankSetter, DefaultQueriers, StateInterface, TxHandler},
     CwEnvError,
@@ -72,6 +72,7 @@ impl<S: StateInterface> MockBase<MockApiBech32, S> {
         let state = Rc::new(RefCell::new(custom_state));
         let app = Rc::new(RefCell::new(
             AppBuilder::new_custom()
+                .with_ibc(IbcSimpleModule::new())
                 .with_api(MockApiBech32::new(prefix))
                 .build(|_, _, _| {}),
         ));
