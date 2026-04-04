@@ -93,6 +93,6 @@ speculoos = "0.11.0"
 log = "0.4.22"
 
 # Interchain / Hermes relayer
-ibc-chain-registry = { path = "../hermes/crates/chain-registry" }
-ibc-relayer-types  = { path = "../hermes/crates/relayer-types" }
+ibc-chain-registry = { git = "https://github.com/permissionlessweb/hermes", branch = "master" }
+ibc-relayer-types = { git = "https://github.com/permissionlessweb/hermes", branch = "master" }
 
