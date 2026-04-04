@@ -86,7 +86,7 @@ cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "ma
 
 cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
 ctor            = "0.2.8"
-cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "main", features = ["daemon"] }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "cw3", features = ["daemon"] }
 cw-orch-daemon  = { path = "." }
 
 duct            = "0.13"

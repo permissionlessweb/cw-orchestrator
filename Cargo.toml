@@ -35,12 +35,12 @@ cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", b
 cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw-utils = { git = "https://github.com/permissionlessweb/cw-minus", branch = "main" }
-neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-tube", branch = "main" }
-osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "main" }
+neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-tube", branch = "dev" }
+osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "cw3" }
 cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main" }
 ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "main" }
 clone-cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "cw3/adapt_for_local_execution" }
-osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "main" }
+osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "cw3" }
 neutron-std = { git = "https://github.com/permissionlessweb/neutron-std", branch = "feat/cw3" }
 simple-ica = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
 simple-ica-controller = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
@@ -53,7 +53,7 @@ anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
 tokio  = { version = "1.39", features = ["full"] }
 
-cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "main" }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "cw3" }
 cw-orch-core     = { path = "packages/cw-orch-core" }
 cw-orch-daemon   = { path = "./cw-orch-daemon" }
 cw-orch-mock     = { path = "packages/cw-orch-mock" }

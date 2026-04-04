@@ -35,6 +35,6 @@ cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 
 counter-contract  = { path = "../../contracts-ws/contracts/counter" }
-cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "main", features = ["daemon"] }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "cw3", features = ["daemon"] }
 env_logger        = "0.10.0"
 pretty_env_logger = "0.5.0"
