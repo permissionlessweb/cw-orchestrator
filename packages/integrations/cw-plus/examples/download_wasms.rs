@@ -1,5 +1,4 @@
 use cosmwasm_std::StdResult;
-use cw_orch::anyhow;
 use std::{io::Cursor, path::PathBuf, str::FromStr};
 
 pub const CW_PLUS_REPO_OWNER: &str = "CosmWasm";

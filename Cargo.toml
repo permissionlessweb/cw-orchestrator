@@ -30,15 +30,24 @@ repository = "https://github.com/AbstractSDK/cw-orchestrator"
 cosmwasm-std     = { version = "3.0.1" }
 cw-storage-plus  = { version = "3.0.0" }
 
-cw-multi-test = { package = "abstract-cw-multi-test", version = "2.2.4" }
-cosmos-sdk-proto  = { version = "0.27.0" }
-cw20 = { version = "2.0.0" }
-cw20-base = { version = "2.0.0" }
-cw-utils = { version = "3.0.0" }
-neutron-test-tube = { version = "5.1.3" }
-osmosis-test-tube = { version = "27.0.1" }
-cosmrs  = { version = "0.22.0" }
-ibc-proto   = { version = "0.52.0" }
+cw-multi-test = { package = "abstract-cw-multi-test", path = "../cw-multi-test-fork" }
+cosmos-sdk-proto  = { path = "../cosmos-rust/cosmos-sdk-proto" }
+cw20 = { path = "../cw-plus/packages/cw20" }
+cw20-base = { path = "../cw-plus/contracts/cw20-base" }
+cw-utils = { path = "../cw-minus/packages/cw-utils" }
+neutron-test-tube = { path = "../neutron-test-tube/packages/neutron-test-tube" }
+osmosis-test-tube = { path = "../osmosis-test-tube/packages/osmosis-test-tube" }
+cosmrs  = { path = "../cosmos-rust/cosmrs" }
+ibc-proto   = { path = "../ibc-proto-rs" }
+clone-cw-multi-test = { path = "../clone-cw-multi-test" }
+osmosis-std = { path = "../osmosis-rust/packages/osmosis-std" }
+neutron-std = { path = "../neutron-std/packages/neutron-std" }
+simple-ica = { path = "../cw-ibc-demo/packages/simple-ica" }
+simple-ica-controller = { path = "../cw-ibc-demo/contracts/simple-ica-controller" }
+simple-ica-host = { path = "../cw-ibc-demo/contracts/simple-ica-host" }
+tendermint       = { path = "../tendermint-rs/tendermint" }
+tendermint-proto = { path = "../tendermint-rs/proto" }
+tendermint-rpc   = { path = "../tendermint-rs/rpc" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
@@ -83,40 +92,7 @@ speculoos = "0.11.0"
 # Logging
 log = "0.4.22"
 
-# Interchain
-ibc-chain-registry = { version = "0.29.2" }
-ibc-relayer-types  = { version = "0.32.2" }
+# Interchain / Hermes relayer
+ibc-chain-registry = { path = "../hermes/crates/chain-registry" }
+ibc-relayer-types  = { path = "../hermes/crates/relayer-types" }
 
-[patch.crates-io]
-# cw-plus
-cw20 = { path = "../cw-plus/packages/cw20" }
-cw20-base = { path = "../cw-plus/contracts/cw20-base" }
-# cw-minus
-cw-utils = { path = "../cw-minus/packages/cw-utils" }
-# cosmos-rust
-cosmrs = { path = "../cosmos-rust/cosmrs" }
-cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
-# ibc-proto
-ibc-proto = { path = "../ibc-proto-rs" }
-# osmosis & neutron
-osmosis-test-tube = { path = "../osmosis-test-tube/packages/osmosis-test-tube" }
-neutron-test-tube = { path = "../neutron-test-tube/packages/neutron-test-tube" }
-# tendermint-rs
-tendermint-proto = { path = "../tendermint-rs/proto" }
-tendermint = { path = "../tendermint-rs/tendermint" }
-tendermint-rpc = { path = "../tendermint-rs/rpc" }
-# clone-cw-multi-test
-clone-cw-multi-test = { path = "../clone-cw-multi-test" }
-# cw-multi-test-fork
-abstract-cw-multi-test = { path = "../cw-multi-test-fork" }
-# osmosis & neutron std
-osmosis-std = { path = "../osmosis-rust/packages/osmosis-std" }
-neutron-std = { path = "../neutron-std/packages/neutron-std" }
-# cw-ibc-demo
-simple-ica = { path = "../cw-ibc-demo/packages/simple-ica" }
-simple-ica-controller = { path = "../cw-ibc-demo/contracts/simple-ica-controller" }
-simple-ica-host = { path = "../cw-ibc-demo/contracts/simple-ica-host" }
-
-[patch.'https://github.com/permissionlessweb/cosmos-rust']
-cosmrs = { path = "../cosmos-rust/cosmrs" }
-cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
