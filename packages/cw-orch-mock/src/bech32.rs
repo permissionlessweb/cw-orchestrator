@@ -72,7 +72,7 @@ impl<S: StateInterface> MockBase<MockApiBech32, S> {
         let state = Rc::new(RefCell::new(custom_state));
         let app = Rc::new(RefCell::new(
             AppBuilder::new_custom()
-                .with_ibc(IbcSimpleModule::new())
+                .with_ibc(IbcSimpleModule::default())
                 .with_api(MockApiBech32::new(prefix))
                 .build(|_, _, _| {}),
         ));
