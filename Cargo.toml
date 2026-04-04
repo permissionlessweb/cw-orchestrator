@@ -31,7 +31,7 @@ repository = "https://github.com/AbstractSDK/cw-orchestrator"
 cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
 cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "mvp" }
 
-cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test", branch = "mvp" }
+cw-multi-test = { package = "abstract-cw-multi-test", git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "bump/cw3/official-ibc-fork" }
 cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main" }
 cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
