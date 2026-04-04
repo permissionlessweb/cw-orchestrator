@@ -83,7 +83,7 @@ cw-orch-mock   = { workspace = true }
 cw-orch-traits = { workspace = true }
 
 [dev-dependencies]
-cosmwasm-schema   = "3.0.0"
+cosmwasm-schema   = "3.0.4"
 counter-contract  = { path = "../contracts-ws/contracts/counter" }
 cw-orch           = { features = ["daemon", "snapshot-testing"], path = "." }
 dotenv            = "0.15.0"

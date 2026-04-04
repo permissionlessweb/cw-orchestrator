@@ -27,8 +27,8 @@ license    = "LGPL-3.0"
 repository = "https://github.com/AbstractSDK/cw-orchestrator"
 
 [workspace.dependencies]
-cosmwasm-std     = { version = "3.0.1" }
-cw-storage-plus  = { version = "3.0.0" }
+cosmwasm-std     = { version = "3.0.4" }
+cw-storage-plus  = { version = "3.0.1" }
 
 cw-multi-test = { package = "abstract-cw-multi-test", path = "../cw-multi-test-fork" }
 cosmos-sdk-proto  = { path = "../cosmos-rust/cosmos-sdk-proto" }

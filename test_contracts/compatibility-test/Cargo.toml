@@ -16,7 +16,7 @@ export    = []
 interface = []
 
 [dependencies]
-cosmwasm-schema   = "3.0.0"
+cosmwasm-schema   = "3.0.4"
 cosmwasm-std    = { workspace = true }
 schemars = "0.8"
 serde           = { workspace = true }

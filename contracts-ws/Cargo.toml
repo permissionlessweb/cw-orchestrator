@@ -8,8 +8,8 @@ resolver = "2"
 edition = "2021"
 
 [workspace.dependencies]
-cosmwasm-std    = "3.0.1"
-cw-storage-plus = { version = "3.0.0" }
+cosmwasm-std    = "3.0.4"
+cw-storage-plus = { version = "3.0.1" }
 cw20             = { path = "../../cw-plus/packages/cw20" }
 cw20-base        = { path = "../../cw-plus/contracts/cw20-base" }
 
