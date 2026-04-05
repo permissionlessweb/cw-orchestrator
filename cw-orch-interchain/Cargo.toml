@@ -18,7 +18,8 @@ all-features = true
 [features]
 default = []
 # enable the optional dependencies
-daemon = ["cw-orch-interchain-core/daemon", "dep:cw-orch-interchain-daemon", "dep:cw-orch-starship"]
+daemon = ["cw-orch-interchain-core/daemon", "dep:cw-orch-interchain-daemon"]
+starship = ["daemon", "dep:cw-orch-starship"]
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
