@@ -18,17 +18,17 @@ cw-utils        = { workspace = true }
 
 cw-controllers = { git = "https://github.com/permissionlessweb/cw-minus", branch = "main" }
 cw1 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
-cw1-subkeys        = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
+cw1-subkeys = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
 cw1-whitelist = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw20-ics20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw3 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw3-fixed-multisig = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
-cw3-flex-multisig  = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
+cw3-flex-multisig = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
 cw4 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
 cw4-group = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
-cw4-stake          = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
+cw4-stake = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main", features = ["library"] }
 
 cw-orch-from-interface-derive = { version = "0.1.0", path = "../../macros/from-interface-derive" }
 
