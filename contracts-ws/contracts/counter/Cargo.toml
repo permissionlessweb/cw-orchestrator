@@ -15,7 +15,7 @@ default = ["export"]
 export  = []
 
 [dependencies]
-cosmwasm-schema = "3.0.4"
+cosmwasm-schema = { workspace = true }
 cosmwasm-std    = { workspace = true }
 cw-orch         = { workspace = true, features = ["daemon"] }
 cw-storage-plus = { workspace = true }

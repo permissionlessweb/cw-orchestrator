@@ -40,7 +40,7 @@ speculoos.workspace    = true
 clap                        = { version = "4.5.16", features = ["derive"] }
 cosmos-sdk-proto            = { workspace = true }
 cw-orch                     = { workspace = true, features = ["daemon"] }
-cw-orch-interchain          = { path = ".", features = ["daemon"] }
+cw-orch-interchain          = { path = ".", features = ["starship"] }
 dotenv                      = "0.15.0"
 env_logger                  = "0.11.5"
 ibc-proto                   = { workspace = true }
