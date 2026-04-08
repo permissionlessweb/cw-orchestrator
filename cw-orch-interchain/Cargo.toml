@@ -32,15 +32,15 @@ ibc-relayer-types.workspace = true
 
 #Used only for testing
 cosmwasm-std.workspace = true
-cw1 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
-cw1-whitelist = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
+cw1 = { path = "../../cw-plus/packages/cw1" }
+cw1-whitelist = { path = "../../cw-plus/contracts/cw1-whitelist" }
 speculoos.workspace    = true
 
 [dev-dependencies]
 clap                        = { version = "4.5.16", features = ["derive"] }
 cosmos-sdk-proto            = { workspace = true }
 cw-orch                     = { workspace = true, features = ["daemon"] }
-cw-orch-interchain          = { path = ".", features = ["starship"] }
+cw-orch-interchain = { path = ".", features = ["starship"] }
 dotenv                      = "0.15.0"
 env_logger                  = "0.11.5"
 ibc-proto                   = { workspace = true }
@@ -48,7 +48,7 @@ ibc-relayer-types.workspace = true
 log.workspace               = true
 pretty_env_logger           = "0.5.0"
 prost-types                 = { workspace = true }
-simple-ica-controller = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
-simple-ica-host = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
+simple-ica-controller = { path = "../../cw-ibc-demo/contracts/simple-ica-controller" }
+simple-ica-host = { path = "../../cw-ibc-demo/contracts/simple-ica-host" }
 speculoos.workspace         = true
 tokio                       = "1.39.2"

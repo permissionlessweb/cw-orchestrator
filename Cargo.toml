@@ -28,57 +28,57 @@ license    = "LGPL-3.0"
 repository = "https://github.com/AbstractSDK/cw-orchestrator"
 
 [workspace.dependencies]
-cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "mvp" }
+cosmwasm-std = { path = "../ZK/cw/zk-cosmwasm/packages/std" }
+cw-storage-plus = { path = "../ZK/cw/zk-storage-plus" }
 
-cw-multi-test = { package = "abstract-cw-multi-test", git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "bump/cw3/official-ibc-fork" }
-cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main" }
-cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
-cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "main" }
-cw-utils = { git = "https://github.com/permissionlessweb/cw-minus", branch = "main" }
-neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-tube", branch = "dev" }
-osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "cw3" }
-cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main" }
-ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "main" }
-clone-cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "cw3/adapt_for_local_execution" }
-osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "cw3" }
-neutron-std = { git = "https://github.com/permissionlessweb/neutron-std", branch = "feat/cw3" }
-simple-ica = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
-simple-ica-controller = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
-simple-ica-host = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "cosmwasm3" }
-tendermint = { git = "https://github.com/permissionlessweb/tendermint-rs", branch = "main" }
-tendermint-proto = { git = "https://github.com/permissionlessweb/tendermint-rs", branch = "main" }
-tendermint-rpc = { git = "https://github.com/permissionlessweb/tendermint-rs", branch = "main" }
+cw-multi-test = { path = "../cw-multi-test-fork" }
+cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
+cw20 = { path = "../cw-plus/packages/cw20" }
+cw20-base = { path = "../cw-plus/contracts/cw20-base" }
+cw-utils = { path = "../ZK/cw/zk-cw-minus/packages/cw-utils" }
+neutron-test-tube = { path = "../neutron-test-tube/packages/neutron-test-tube" }
+osmosis-test-tube = { path = "../osmosis-test-tube/packages/osmosis-test-tube" }
+cosmrs = { path = "../cosmos-rust/cosmrs" }
+ibc-proto = { path = "../ibc-proto-rs" }
+clone-cw-multi-test = { path = "../clone-cw-multi-test" }
+osmosis-std = { path = "../osmosis-rust/packages/osmosis-std" }
+neutron-std = { path = "../neutron-std/packages/neutron-std" }
+simple-ica = { path = "../cw-ibc-demo/packages/simple-ica" }
+simple-ica-controller = { path = "../cw-ibc-demo/contracts/simple-ica-controller" }
+simple-ica-host = { path = "../cw-ibc-demo/contracts/simple-ica-host" }
+tendermint = { path = "../tendermint-rs/tendermint" }
+tendermint-proto = { path = "../tendermint-rs/proto" }
+tendermint-rpc = { path = "../tendermint-rs/rpc" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
 tokio  = { version = "1.39", features = ["full"] }
 
-cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "cw3" }
-cw-orch-core     = { path = "packages/cw-orch-core" }
-cw-orch-daemon   = { path = "./cw-orch-daemon" }
-cw-orch-mock     = { path = "packages/cw-orch-mock" }
+cw-orch = { path = "cw-orch" }
+cw-orch-core = { path = "packages/cw-orch-core" }
+cw-orch-daemon = { path = "cw-orch-daemon" }
+cw-orch-mock = { path = "packages/cw-orch-mock" }
 cw-orch-networks = { path = "packages/cw-orch-networks" }
-cw-orch-traits   = { path = "packages/cw-orch-traits" }
+cw-orch-traits = { path = "packages/cw-orch-traits" }
 
 # Macros
-cw-orch-contract-derive = { path = "packages/macros/cw-orch-contract-derive", version = "0.21.0" }
-cw-orch-fns-derive      = { path = "packages/macros/cw-orch-fns-derive", version = "0.23.0" }
+cw-orch-contract-derive = { path = "packages/macros/cw-orch-contract-derive" }
+cw-orch-fns-derive = { path = "packages/macros/cw-orch-fns-derive" }
 
 # Extensions
-cw-orch-neutron-test-tube = {  version = "0.1.0", path = "packages/cw-orch-neutron-test-tube" }
-cw-orch-osmosis-test-tube = { version = "0.4.0", path = "packages/cw-orch-osmosis-test-tube" }
+cw-orch-neutron-test-tube = { path = "packages/cw-orch-neutron-test-tube" }
+cw-orch-osmosis-test-tube = { path = "packages/cw-orch-osmosis-test-tube" }
 
 #Clone Testing
-cw-orch-clone-testing = { version = "0.8.0", path = "packages/clone-testing" }
+cw-orch-clone-testing = { path = "packages/clone-testing" }
 
 # Interchain
-cw-orch-interchain        = { path = "cw-orch-interchain", version = "0.8.0" }
-cw-orch-interchain-core   = { path = "packages/interchain/interchain-core", version = "0.9.0" }
-cw-orch-interchain-daemon = { path = "packages/interchain/interchain-daemon", version = "0.9.0" }
-cw-orch-interchain-mock   = { path = "packages/interchain/interchain-mock", version = "0.9.0" }
-cw-orch-proto             = { path = "packages/interchain/proto", version = "0.9.0" }
-cw-orch-starship          = { path = "packages/interchain/starship", version = "0.7.0" }
+cw-orch-interchain = { path = "cw-orch-interchain" }
+cw-orch-interchain-core = { path = "packages/interchain/interchain-core" }
+cw-orch-interchain-daemon = { path = "packages/interchain/interchain-daemon" }
+cw-orch-interchain-mock = { path = "packages/interchain/interchain-mock" }
+cw-orch-proto = { path = "packages/interchain/proto" }
+cw-orch-starship = { path = "packages/interchain/starship" }
 
 
 prost       = "0.14.1"
@@ -94,22 +94,43 @@ speculoos = "0.11.0"
 log = "0.4.22"
 
 # Interchain / Hermes relayer
-ibc-chain-registry = { git = "https://github.com/permissionlessweb/hermes", branch = "master" }
-ibc-relayer-types = { git = "https://github.com/permissionlessweb/hermes", branch = "master" }
+ibc-chain-registry = { path = "../hermes/crates/chain-registry" }
+ibc-relayer-types = { path = "../hermes/crates/relayer-types" }
 
 # Unify crates.io transitive deps with our git forks
 [patch.crates-io]
-cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cosmwasm-core = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cosmwasm-crypto = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cosmwasm-derive = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cosmwasm-schema-derive = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cw-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cw-schema-derive = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
-cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "mvp" }
 
 # Resolve self-referencing git deps to local paths
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
+cosmwasm-std = { path = "../ZK/cw/zk-cosmwasm/packages/std" }
+cosmwasm-core = { path = "../ZK/cw/zk-cosmwasm/packages/core" }
+cosmwasm-crypto = { path = "../ZK/cw/zk-cosmwasm/packages/crypto" }
+cosmwasm-derive = { path = "../ZK/cw/zk-cosmwasm/packages/derive" }
+cosmwasm-schema = { path = "../ZK/cw/zk-cosmwasm/packages/schema" }
+cosmwasm-schema-derive = { path = "../ZK/cw/zk-cosmwasm/packages/schema-derive" }
+cw-schema = { path = "../ZK/cw/zk-cosmwasm/packages/cw-schema" }
+cw-schema-derive = { path = "../ZK/cw/zk-cosmwasm/packages/cw-schema-derive" }
+cw-storage-plus = { path = "../ZK/cw/zk-storage-plus" }
 [patch.'https://github.com/permissionlessweb/cw-orchestrator']
 cw-orch = { path = "cw-orch" }
 cw-orch-core = { path = "packages/cw-orch-core" }

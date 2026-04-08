@@ -21,7 +21,7 @@ ibc-proto        = { workspace = true }
 async-recursion   = "1.1.1"
 base64            = "0.22.1"
 cosmrs            = { workspace = true }
-cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
+cosmwasm-schema = { path = "../../../../ZK/cw/zk-cosmwasm/packages/schema" }
 
 derive_builder    = "0.20.0"
 diff-struct       = "0.5.3"
