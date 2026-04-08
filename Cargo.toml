@@ -31,7 +31,7 @@ repository = "https://github.com/AbstractSDK/cw-orchestrator"
 cosmwasm-std = { path = "../ZK/cw/zk-cosmwasm/packages/std" }
 cw-storage-plus = { path = "../ZK/cw/zk-storage-plus" }
 
-cw-multi-test = { path = "../cw-multi-test-fork" }
+cw-multi-test = { path = "../cw-multi-test-fork", package = "abstract-cw-multi-test" }
 cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
 cw20 = { path = "../cw-plus/packages/cw20" }
 cw20-base = { path = "../cw-plus/contracts/cw20-base" }
@@ -102,26 +102,6 @@ ibc-relayer-types = { path = "../hermes/crates/relayer-types" }
 
 # Resolve self-referencing git deps to local paths
 # Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
-
-# Fork patches (managed by dep-switch.py)
 cosmwasm-std = { path = "../ZK/cw/zk-cosmwasm/packages/std" }
 cosmwasm-core = { path = "../ZK/cw/zk-cosmwasm/packages/core" }
 cosmwasm-crypto = { path = "../ZK/cw/zk-cosmwasm/packages/crypto" }
@@ -131,6 +111,7 @@ cosmwasm-schema-derive = { path = "../ZK/cw/zk-cosmwasm/packages/schema-derive" 
 cw-schema = { path = "../ZK/cw/zk-cosmwasm/packages/cw-schema" }
 cw-schema-derive = { path = "../ZK/cw/zk-cosmwasm/packages/cw-schema-derive" }
 cw-storage-plus = { path = "../ZK/cw/zk-storage-plus" }
+
 [patch.'https://github.com/permissionlessweb/cw-orchestrator']
 cw-orch = { path = "cw-orch" }
 cw-orch-core = { path = "packages/cw-orch-core" }

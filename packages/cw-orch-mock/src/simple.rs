@@ -121,4 +121,12 @@ impl<S: StateInterface> BankSetter for Mock<S> {
     ) -> Result<(), <Self as TxHandler>::Error> {
         (*self).set_balance(address, amount)
     }
+
+    fn add_balance(
+        &mut self,
+        address: &Addr,
+        amount: Vec<Coin>,
+    ) -> Result<(), <Self as TxHandler>::Error> {
+        (*self).add_balance(address, amount)
+    }
 }

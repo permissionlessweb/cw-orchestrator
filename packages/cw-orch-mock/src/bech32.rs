@@ -158,6 +158,14 @@ impl<S: StateInterface> BankSetter for MockBech32<S> {
     ) -> Result<(), <Self as TxHandler>::Error> {
         (*self).set_balance(&Addr::unchecked(address), amount)
     }
+
+    fn add_balance(
+        &mut self,
+        address: &Addr,
+        amount: Vec<Coin>,
+    ) -> Result<(), <Self as TxHandler>::Error> {
+        (*self).add_balance(&Addr::unchecked(address), amount)
+    }
 }
 
 #[cfg(test)]

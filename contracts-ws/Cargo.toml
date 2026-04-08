@@ -49,6 +49,8 @@ cw-orch-interchain = { path = "../cw-orch-interchain" }
 # Fork patches (managed by dep-switch.py)
 
 # Fork patches (managed by dep-switch.py)
+
+# Fork patches (managed by dep-switch.py)
 cosmwasm-std = { path = "../../ZK/cw/zk-cosmwasm/packages/std" }
 cosmwasm-core = { path = "../../ZK/cw/zk-cosmwasm/packages/core" }
 cosmwasm-crypto = { path = "../../ZK/cw/zk-cosmwasm/packages/crypto" }
