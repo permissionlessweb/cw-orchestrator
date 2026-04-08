@@ -16,7 +16,7 @@ export    = []
 interface = []
 
 [dependencies]
-cosmwasm-schema = { path = "../../../ZK/cw/zk-cosmwasm/packages/schema" }
+cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 cosmwasm-std    = { workspace = true }
 schemars = "0.8"
 serde           = { workspace = true }
@@ -24,6 +24,6 @@ serde_json      = "1.0.79"
 thiserror       = { version = "1.0.21" }
 # This version should not be a path dependency and be kept to the last cw-orch version (beyond v0.23)
 # Keeping a different package until v0.23 to avoid package conflicts
-cw-orch = { package = "aaa-test-cw-orch", path = "../../cw-orch" }
+cw-orch = { package = "aaa-test-cw-orch", git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
 # Keep the old-cw-orch version to 0.22 for backwards compatibility
-old-cw-orch = { package = "cw-orch", path = "../../cw-orch" }
+old-cw-orch = { package = "cw-orch", git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }

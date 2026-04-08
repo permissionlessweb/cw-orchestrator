@@ -83,14 +83,14 @@ cw-orch-mock   = { workspace = true }
 cw-orch-traits = { workspace = true }
 
 [dev-dependencies]
-cosmwasm-schema = { path = "../../ZK/cw/zk-cosmwasm/packages/schema" }
+cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 counter-contract  = { path = "../contracts-ws/contracts/counter" }
-cw-orch = { path = ".", features = ["daemon", "snapshot-testing"] }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp", features = ["daemon", "snapshot-testing"] }
 dotenv            = "0.15.0"
 env_logger        = "0.11.5"
 mock-contract     = { path = "../contracts-ws/contracts/mock_contract" }
 mock-contract-u64 = { path = "../contracts-ws/contracts/mock_contract_u64" }
-osmosis-std = { path = "../../osmosis-rust/packages/osmosis-std" }
+osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "zk-mvp" }
 prost             = { workspace = true }
 prost-types       = { workspace = true }
 serde_json        = { workspace = true }

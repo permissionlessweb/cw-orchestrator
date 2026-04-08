@@ -81,13 +81,13 @@ libc-print = "0.1.23"
 toml       = "0.8"
 
 [dev-dependencies]
-cw20 = { path = "../../cw-plus/packages/cw20" }
-cw20-base = { path = "../../cw-plus/contracts/cw20-base" }
+cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
+cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
 
-cosmwasm-schema = { path = "../../ZK/cw/zk-cosmwasm/packages/schema" }
+cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 ctor            = "0.2.8"
-cw-orch = { path = "../cw-orch", features = ["daemon"] }
-cw-orch-daemon = { path = "." }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp", features = ["daemon"] }
+cw-orch-daemon = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
 
 duct            = "0.13"
 env_logger      = "0.11.5"
