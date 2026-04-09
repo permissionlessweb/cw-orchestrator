@@ -40,7 +40,7 @@ neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-t
 osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "zk-mvp" }
 cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "zk-mvp" }
 ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "zk-mvp" }
-clone-cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "zk-mvp" }
+clone-cw-multi-test = { package = "abstract-cw-multi-test", git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "zk-mvp" }
 osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "zk-mvp" }
 neutron-std = { git = "https://github.com/permissionlessweb/neutron-std", branch = "zk-mvp" }
 simple-ica = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "zk-mvp" }
@@ -101,6 +101,7 @@ ibc-relayer-types = { git = "https://github.com/permissionlessweb/hermes", branc
 [patch.crates-io]
 
 # Resolve self-referencing git deps to local paths
+
 
 cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 cosmwasm-core = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }

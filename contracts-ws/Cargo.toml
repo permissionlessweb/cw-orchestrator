@@ -38,6 +38,7 @@ cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrat
 
 
 
+
 cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 cosmwasm-core = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 cosmwasm-crypto = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
