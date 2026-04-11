@@ -35,6 +35,6 @@ cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp"
 cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
 
 counter-contract  = { path = "../../contracts-ws/contracts/counter" }
-cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp", features = ["daemon"] }
+cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
 env_logger        = "0.10.0"
 pretty_env_logger = "0.5.0"

@@ -21,26 +21,25 @@ default = []
 daemon = ["cw-orch-interchain-core/daemon", "dep:cw-orch-interchain-daemon"]
 starship = ["daemon", "dep:cw-orch-starship"]
 
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+
+#Used only for testing
+cosmwasm-std.workspace = true
 
 cw-orch-interchain-core     = { workspace = true }
 cw-orch-interchain-daemon   = { workspace = true, optional = true }
 cw-orch-interchain-mock     = { workspace = true }
 cw-orch-starship            = { workspace = true, optional = true }
-ibc-relayer-types.workspace = true
-
-#Used only for testing
-cosmwasm-std.workspace = true
 cw1 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
 cw1-whitelist = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
+ibc-relayer-types.workspace = true
 speculoos.workspace    = true
 
 [dev-dependencies]
 clap                        = { version = "4.5.16", features = ["derive"] }
 cosmos-sdk-proto            = { workspace = true }
 cw-orch                     = { workspace = true, features = ["daemon"] }
-cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp", features = ["starship"] }
+cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
 dotenv                      = "0.15.0"
 env_logger                  = "0.11.5"
 ibc-proto                   = { workspace = true }

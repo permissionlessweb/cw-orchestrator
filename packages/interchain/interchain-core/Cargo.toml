@@ -12,7 +12,6 @@ version              = "0.9.2"
 [features]
 daemon = ["dep:cw-orch-daemon"]
 
-
 [dependencies]
 base64            = "0.22.1"
 cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
@@ -35,6 +34,6 @@ tonic      = { workspace = true }
 cosmos-sdk-proto   = { workspace = true }
 counter-contract   = { path = "../../../contracts-ws/contracts/counter" }
 cw-orch            = { workspace = true }
-cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp", features = ["daemon"] }
+cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
 ibc-proto          = { workspace = true }
 prost-types        = { workspace = true }

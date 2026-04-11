@@ -9,19 +9,18 @@ version              = "0.9.0"
 
 [lib]
 
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 cw-orch-core   = { workspace = true }
 cw-orch-daemon = { workspace = true }
 
-tokio = { workspace = true }
-ibc-proto        = { workspace = true }
-async-recursion   = "1.1.1"
+async-recursion = "1.1.1"
 base64            = "0.22.1"
 cosmrs            = { workspace = true }
 cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
+ibc-proto        = { workspace = true }
+tokio = { workspace = true }
 
 derive_builder    = "0.20.0"
 diff-struct       = "0.5.3"
@@ -43,5 +42,5 @@ dialoguer               = "0.11.0"
 
 anyhow             = { workspace = true }
 cw-orch            = { workspace = true, features = ["daemon"] }
-cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp", features = ["starship"] }
+cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
 pretty_env_logger  = "0.5.0"

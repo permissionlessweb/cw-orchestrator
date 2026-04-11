@@ -1,23 +1,24 @@
 [workspace]
 exclude = [
-  "test_contracts/compatibility-test", # TODO: add new after cw-orch-core 2.0.0 as it's breaking, it shouldn't be compatible
-  "contracts-ws",
+    # TODO: add new after cw-orch-core 2.0.0 as it's breaking, it shouldn't be compatible
+    "contracts-ws",
+    "test_contracts/compatibility-test",
 ]
 members = [
-  "cw-orch",
-  "cw-orch-daemon",
-  "cw-orch-interchain",
-  "packages/cw-orch-core",
-  "packages/cw-orch-mock",
-  "packages/cw-orch-networks",
-  "packages/clone-testing",
-  "packages/cw-orch-osmosis-test-tube",
-  "packages/cw-orch-neutron-test-tube",
-  "packages/cw-orch-traits",
-  "test_contracts/*",
-  "packages/macros/*",
-  "packages/interchain/*",
-  "packages/integrations/*",
+    "cw-orch",
+    "cw-orch-daemon",
+    "cw-orch-interchain",
+    "packages/clone-testing",
+    "packages/cw-orch-core",
+    "packages/cw-orch-mock",
+    "packages/cw-orch-networks",
+    "packages/cw-orch-neutron-test-tube",
+    "packages/cw-orch-osmosis-test-tube",
+    "packages/cw-orch-traits",
+    "packages/integrations/*",
+    "packages/interchain/*",
+    "packages/macros/*",
+    "test_contracts/*",
 ]
 resolver = "2"
 
@@ -31,18 +32,18 @@ repository = "https://github.com/AbstractSDK/cw-orchestrator"
 cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "zk-mvp" }
 
-cw-multi-test = { package = "abstract-cw-multi-test", git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "zk-mvp" }
+clone-cw-multi-test = { git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "zk-mvp" }
 cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "zk-mvp" }
+cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "zk-mvp" }
+cw-multi-test = { package = "abstract-cw-multi-test", git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "zk-mvp" }
+cw-utils = { git = "https://github.com/permissionlessweb/cw-minus", branch = "zk-mvp" }
 cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
 cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
-cw-utils = { git = "https://github.com/permissionlessweb/cw-minus", branch = "zk-mvp" }
-neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-tube", branch = "zk-mvp" }
-osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "zk-mvp" }
-cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "zk-mvp" }
 ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "zk-mvp" }
-clone-cw-multi-test = { package = "abstract-cw-multi-test", git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "zk-mvp" }
-osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "zk-mvp" }
 neutron-std = { git = "https://github.com/permissionlessweb/neutron-std", branch = "zk-mvp" }
+neutron-test-tube = { git = "https://github.com/permissionlessweb/neutron-test-tube", branch = "zk-mvp" }
+osmosis-std = { git = "https://github.com/permissionlessweb/osmosis-rust", branch = "zk-mvp" }
+osmosis-test-tube = { git = "https://github.com/permissionlessweb/osmosis-test-tube", branch = "zk-mvp" }
 simple-ica = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "zk-mvp" }
 simple-ica-controller = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "zk-mvp" }
 simple-ica-host = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "zk-mvp" }
@@ -80,15 +81,14 @@ cw-orch-interchain-mock = { path = "packages/interchain/interchain-mock" }
 cw-orch-proto = { path = "packages/interchain/proto" }
 cw-orch-starship = { path = "packages/interchain/starship" }
 
-
 prost       = "0.14.1"
 prost-types = "0.14.1"
 serde_json  = "1.0.125"
 sha2        = { version = "0.10.8" }
-thiserror   = { version = "1.0.63" }
-tonic       = { version = "0.14.1", features = ["codegen"] }
 # Test deps
 speculoos = "0.11.0"
+thiserror   = { version = "1.0.63" }
+tonic       = { version = "0.14.1", features = ["codegen"] }
 
 # Logging
 log = "0.4.22"
@@ -99,9 +99,7 @@ ibc-relayer-types = { git = "https://github.com/permissionlessweb/hermes", branc
 
 # Unify crates.io transitive deps with our git forks
 [patch.crates-io]
-
 # Resolve self-referencing git deps to local paths
-
 
 cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
 cosmwasm-core = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
