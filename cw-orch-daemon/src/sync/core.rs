@@ -6,10 +6,15 @@ use crate::{
     senders::{builder::SenderBuilder, query::QuerySender},
     CosmTxResponse, DaemonAsyncBase, DaemonBuilder, DaemonError, DaemonState,
 };
+use cosmrs::proto::cosmwasm;
 use cosmwasm_std::{Addr, Coin};
 use cw_orch_core::{
     contract::{interface_traits::Uploadable, WasmPath},
-    environment::{ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler},
+    environment::{
+        ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler, TxResponse,
+        ZkTxHandler,
+    },
+    CwEnvError,
 };
 use cw_orch_traits::stargate::Stargate;
 use serde::Serialize;

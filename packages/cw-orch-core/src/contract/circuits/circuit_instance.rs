@@ -5,8 +5,14 @@
 //! On Terp Network the on-chain verifying logic is invoked through the
 //! `zk-wasmvm` host extension, not through a contract address.
 
+use std::path::PathBuf;
+
 use crate::{
-    environment::{AccessConfig, ChainState, IndexResponse, StateInterface, TxHandler, TxResponse},
+    contract::circuits::circuit_interface_traits::CircuitUploadable,
+    environment::{
+        AccessConfig, ChainInfoOwned, ChainState, IndexResponse, StateInterface, TxResponse,
+        ZkTxHandler,
+    },
     error::CwEnvError,
     log::contract_target,
 };
@@ -25,7 +31,7 @@ pub struct Circuit<Chain> {
     /// Chain / environment handle.
     pub(crate) chain: Chain,
     /// Fallback `code_id` when none is present in the state store.
-    pub default_code_id: Option<u64>,
+    pub default_zk_id: Option<u64>,
 }
 
 // ── Constructors & helpers ────────────────────────────────────────────────────
@@ -36,7 +42,7 @@ impl<Chain> Circuit<Chain> {
         Circuit {
             id: id.to_string(),
             chain,
-            default_code_id: None,
+            default_zk_id: None,
         }
     }
 
@@ -46,74 +52,124 @@ impl<Chain> Circuit<Chain> {
     }
 
     /// Set a fallback `code_id` used when the state store has no entry.
-    pub fn set_default_code_id(&mut self, code_id: u64) {
-        self.default_code_id = Some(code_id);
+    pub fn set_default_zk_id(&mut self, zk_id: u64) {
+        self.default_zk_id = Some(zk_id);
     }
 }
 
 // ── State operations ──────────────────────────────────────────────────────────
 
 impl<Chain: ChainState> Circuit<Chain> {
-    /// Read the `code_id` from the state store, falling back to
-    /// [`Self::default_code_id`] if none is found.
-    pub fn code_id(&self) -> Result<u64, CwEnvError> {
-        self.chain
-            .state()
-            .get_code_id(&self.id)
-            .or(self
-                .default_code_id
-                .ok_or(CwEnvError::CodeIdNotInStore(self.id.clone())))
+    /// Read the `zk_id` from the state store, falling back to
+    /// [`Self::default_zk_id`] if none is found.
+    pub fn zk_id(&self) -> Result<u64, CwEnvError> {
+        let state_zk_id = self.chain.state().get_code_id(&self.id);
+        // If the code_ids is not present, we default to the default code_id or an error
+        state_zk_id.or(self
+            .default_zk_id
+            .ok_or(CwEnvError::CodeIdNotInStore(self.id.clone())))
     }
 
     /// Persist a `code_id` in the state store.
-    pub fn set_code_id(&self, code_id: u64) {
-        self.chain.state().set_code_id(&self.id, code_id)
+    pub fn set_zk_id(&self, zk_id: u64) {
+        self.chain.state().set_code_id(&self.id, zk_id)
     }
 
-    /// Remove the `code_id` entry from the state store.
-    pub fn remove_code_id(&self) {
+    /// Remove the `zk_id` entry from the state store.
+    pub fn remove_zk_id(&self) {
         self.chain.state().remove_code_id(&self.id)
     }
 }
 
 // ── Chain operations ──────────────────────────────────────────────────────────
-
-impl<Chain: TxHandler> Circuit<Chain> {
-    /// Upload the circuit WASM artefact with a custom access config.
-    pub fn upload_with_access_config(
+impl<Chain: ZkTxHandler> Circuit<Chain> {
+    /// Upload a raw zk-circuit binary (no wasm wrapper).
+    /// Uses `store-circuit` under the hood.
+    pub fn upload_circuit(
         &self,
-        source: &impl Uploadable,
-        access_config: Option<AccessConfig>,
+        source: &impl CircuitUploadable,
     ) -> Result<TxResponse<Chain>, CwEnvError> {
         log::info!(
             target: &contract_target(),
-            "[circuit][{}][Upload]",
+            "[circuit][{}][upload_circuit]",
             self.id,
         );
 
-        let resp = self
-            .chain
-            .upload_with_access_config(source, access_config)
-            .map_err(Into::into)?;
-        let code_id = resp.uploaded_code_id()?;
-        self.set_code_id(code_id);
+        let resp = self.chain.upload_circuit(source)?;
+        let zk_id = resp.uploaded_zk_id()?;
+        self.set_zk_id(zk_id);
+
         log::info!(
             target: &contract_target(),
-            "[circuit][{}][Uploaded] code_id {}",
+            "[circuit][{}][upload_circuit] zk_id {}",
             self.id,
-            code_id
+            zk_id
         );
         log::debug!(
             target: &contract_target(),
-            "[circuit][{}][Uploaded] response {:?}",
+            "[circuit][{}][upload_circuit] response {:?}",
             self.id,
             resp
         );
         Ok(resp)
     }
 
-    /// Upload the circuit WASM artefact with the default access config.
-    pub fn upload(&self, source: &impl Uploadable) -> Result<TxResponse<Chain>, CwEnvError> {
-        self.upload_with_access_config(source, None)
+    /// Upload a raw zk-circuit with custom access config.
+    pub fn upload_circuit_with_access_config(
+        &self,
+        source: &impl CircuitUploadable,
+        access_config: Option<AccessConfig>,
+    ) -> Result<TxResponse<Chain>, CwEnvError> {
+        log::info!(
+            target: &contract_target(),
+            "[circuit][{}][upload_circuit_with_access_config]",
+            self.id,
+        );
+
+        let resp = self
+            .chain
+            .upload_circuit_with_access_config(source, access_config)?;
+        let zk_id = resp.uploaded_zk_id()?;
+        self.set_zk_id(zk_id);
+
+        log::info!(
+            target: &contract_target(),
+            "[circuit][{}][upload_circuit_with_access_config] zk_id {}",
+            self.id,
+            zk_id
+        );
+        Ok(resp)
+    }
+
+    /// Upload a WASM artifact with its Halo2 verifying key.
+    /// Uses `store-with-vk` under the hood.
+    pub fn upload_with_vk(
+        &self,
+        source: &impl Uploadable,
+        vk_bytes: &[u8],
+    ) -> Result<TxResponse<Chain>, CwEnvError> {
+        unimplemented!("not yet implemented: uploading with vk")
+    }
+
+    /// Upload wasm+vk with custom access config.
+    pub fn upload_with_vk_and_access_config(
+        &self,
+        source: &impl Uploadable,
+        vk_bytes: &[u8],
+        access_config: Option<AccessConfig>,
+    ) -> Result<TxResponse<Chain>, CwEnvError> {
+        unimplemented!("not yet implemented: uploading with vk")
+    }
+}
+
+impl<Chain: ChainState> CircuitUploadable for Circuit<Chain> {
+    fn circuit_name() -> String {
+        unimplemented!("todo: mirror how we access wasm circuits paths from the interface")
+    }
+    fn circuit_path(chain: &ChainInfoOwned) -> PathBuf {
+        // Mirror the logic from Uploadable::wasm() but without .wasm extension check
+        let mut path = PathBuf::from("artifacts");
+        path.push(Self::circuit_name());
+        path
     }
 }

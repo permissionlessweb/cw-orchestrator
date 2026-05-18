@@ -30,8 +30,8 @@ cw-orch-interchain-core     = { workspace = true }
 cw-orch-interchain-daemon   = { workspace = true, optional = true }
 cw-orch-interchain-mock     = { workspace = true }
 cw-orch-starship            = { workspace = true, optional = true }
-cw1 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
-cw1-whitelist = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
+cw1 = { path = "../../cw-plus/packages/cw1" }
+cw1-whitelist = { path = "../../cw-plus/contracts/cw1-whitelist" }
 ibc-relayer-types.workspace = true
 speculoos.workspace    = true
 
@@ -39,7 +39,7 @@ speculoos.workspace    = true
 clap                        = { version = "4.5.16", features = ["derive"] }
 cosmos-sdk-proto            = { workspace = true }
 cw-orch                     = { workspace = true, features = ["daemon"] }
-cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
+cw-orch-interchain = { path = "." }
 dotenv                      = "0.15.0"
 env_logger                  = "0.11.5"
 ibc-proto                   = { workspace = true }
@@ -47,7 +47,7 @@ ibc-relayer-types.workspace = true
 log.workspace               = true
 pretty_env_logger           = "0.5.0"
 prost-types                 = { workspace = true }
-simple-ica-controller = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "zk-mvp" }
-simple-ica-host = { git = "https://github.com/permissionlessweb/cw-ibc-demo", branch = "zk-mvp" }
+simple-ica-controller = { path = "../../cw-ibc-demo/contracts/simple-ica-controller" }
+simple-ica-host = { path = "../../cw-ibc-demo/contracts/simple-ica-host" }
 speculoos.workspace         = true
 tokio                       = "1.39.2"

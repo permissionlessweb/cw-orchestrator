@@ -1,7 +1,12 @@
 //! Transactional traits for execution environments.
 
 use super::{ChainState, IndexResponse};
-use crate::{contract::interface_traits::Uploadable, error::CwEnvError};
+use crate::{
+    contract::{
+        circuits::circuit_interface_traits::CircuitUploadable, interface_traits::Uploadable,
+    },
+    error::CwEnvError,
+};
 use cosmwasm_std::{Addr, Binary, Coin};
 use serde::Serialize;
 use std::fmt::Debug;
@@ -102,6 +107,39 @@ pub trait TxHandler: ChainState + Clone {
     ) -> Result<Self::Response, Self::Error> {
         unimplemented!("Bank send is not implemented on this env")
     }
+}
+
+/// Extension trait for chains that support zk-circuit WASM operations.
+///
+/// Implemented as an extension to avoid modifying cw-orch trait hierarchies,
+/// allowing coexistence with upstream cw-orch while adding fork-specific operations.
+pub trait ZkTxHandler: TxHandler {
+    /// Store a raw zk-circuit binary (no wasm wrapper).
+    /// Corresponds to `terpd tx wasm store-circuit`.
+    fn upload_circuit<T: CircuitUploadable>(&self, circuit_source: &T) -> Result<TxResponse<Self>, CwEnvError>;
+
+    /// Store a wasm binary together with its Halo2 verifying key.
+    /// Corresponds to `terpd tx wasm store-with-vk`.
+    fn store_with_vk(
+        &self,
+        wasm_bytes: &[u8],
+        vk_bytes: &[u8],
+    ) -> Result<TxResponse<Self>, CwEnvError>;
+
+    /// Store a circuit with custom access config (optional extension).
+    fn upload_circuit_with_access_config<T: CircuitUploadable>(
+        &self,
+        circuit_source: &T,
+        access_config: Option<AccessConfig>,
+    ) -> Result<TxResponse<Self>, CwEnvError>;
+
+    /// Store wasm+vk with custom access config (optional extension).
+    fn store_with_vk_and_access_config<T: CircuitUploadable, W: Uploadable>(
+        &self,
+        wasm_bytes: &W,
+        vk_bytes: &T,
+        access_config: Option<AccessConfig>,
+    ) -> Result<TxResponse<Self>, CwEnvError>;
 }
 
 pub enum AccessConfig {

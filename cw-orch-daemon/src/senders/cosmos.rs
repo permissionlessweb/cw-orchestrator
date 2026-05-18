@@ -27,7 +27,7 @@ use cosmrs::{
 use cosmwasm_std::{coin, Addr, Coin};
 use cw_orch_core::{
     contract::WasmPath,
-    environment::{AccessConfig, ChainInfoOwned, ChainKind},
+    environment::{AccessConfig, ChainInfoOwned, ChainKind, ZkTxHandler},
     CoreEnvVars, CwEnvError,
 };
 use std::sync::Arc;

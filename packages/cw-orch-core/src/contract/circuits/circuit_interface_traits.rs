@@ -5,9 +5,10 @@
 //! | `ContractInstance<C>`   | `CircuitInstance<C>`       | No address, code_id only|
 //! | `CwOrchUpload<C>`       | `CwOrchCircuitUpload<C>`   | Delegates to `Circuit`  |
 
+use std::path::PathBuf;
+
 use crate::{
-    contract::interface_traits::Uploadable,
-    environment::{AccessConfig, ChainState, TxHandler, TxResponse},
+    environment::{AccessConfig, ChainInfoOwned, ChainState, TxHandler, TxResponse, ZkTxHandler},
     error::CwEnvError,
 };
 
@@ -32,23 +33,23 @@ pub trait CircuitInstance<Chain: ChainState> {
     }
 
     /// Read the uploaded `code_id` from the state store.
-    fn code_id(&self) -> Result<u64, CwEnvError> {
-        Circuit::code_id(self.as_circuit())
+    fn zk_id(&self) -> Result<u64, CwEnvError> {
+        Circuit::zk_id(self.as_circuit())
     }
 
     /// Persist a `code_id` in the state store.
-    fn set_code_id(&self, code_id: u64) {
-        Circuit::set_code_id(self.as_circuit(), code_id)
+    fn set_zk_id(&self, code_id: u64) {
+        Circuit::set_zk_id(self.as_circuit(), code_id)
     }
 
     /// Remove the `code_id` from the state store.
-    fn remove_code_id(&self) {
-        Circuit::remove_code_id(self.as_circuit())
+    fn remove_zk_id(&self) {
+        Circuit::remove_zk_id(self.as_circuit())
     }
 
     /// Set a fallback `code_id` used when the state store has no entry.
-    fn set_default_code_id(&mut self, code_id: u64) {
-        Circuit::set_default_code_id(self.as_circuit_mut(), code_id)
+    fn set_default_zk_id(&mut self, code_id: u64) {
+        Circuit::set_default_zk_id(self.as_circuit_mut(), code_id)
     }
 }
 
@@ -57,23 +58,68 @@ pub trait CircuitInstance<Chain: ChainState> {
 /// Upload trait for circuit WASM artefacts.
 ///
 /// Mirrors [`crate::contract::interface_traits::CwOrchUpload`].
-/// Requires [`CircuitInstance`] for `code_id` state tracking and
-/// [`Uploadable`] for the WASM bytes / path.
-pub trait CwOrchCircuitUpload<Chain: TxHandler>:
-    CircuitInstance<Chain> + Uploadable + Sized
+/// Requires [`CircuitInstance`] for `zk_id` state tracking and
+/// [`CircuitUploadable`] for the WASM bytes / path.
+pub trait CwOrchCircuitUpload<Chain: ZkTxHandler>:
+    CircuitInstance<Chain> + CircuitUploadable + Sized
 {
     /// Upload the circuit WASM to the chain.
-    fn upload(&self) -> Result<TxResponse<Chain>, CwEnvError> {
-        self.as_circuit().upload(self)
+    fn upload_circuit(&self) -> Result<TxResponse<Chain>, CwEnvError> {
+        self.as_circuit().upload_circuit(self)
     }
 
     /// Upload the circuit WASM with a custom instantiate access config.
-    fn upload_with_access_config(
+    fn upload_circuit_with_access_config(
         &self,
         access_config: Option<AccessConfig>,
     ) -> Result<TxResponse<Chain>, CwEnvError> {
-        self.as_circuit().upload_with_access_config(self, access_config)
+        self.as_circuit()
+            .upload_circuit_with_access_config(self, access_config)
     }
 }
 
-impl<T: CircuitInstance<Chain> + Uploadable, Chain: TxHandler> CwOrchCircuitUpload<Chain> for T {}
+/// Trait for uploadable ZK circuit binaries.
+/// Unlike `Uploadable`, this does NOT enforce a `.wasm` file extension.
+pub trait CircuitUploadable {
+    /// Returns the filename of the circuit binary (without path).
+    fn circuit_name() -> String;
+
+    /// Returns the path to the circuit binary file.
+    /// Default: looks in artifacts/ directory using circuit_name()
+    fn circuit_path(_chain: &ChainInfoOwned) -> PathBuf {
+        let mut path = PathBuf::from("artifacts");
+        path.push(Self::circuit_name());
+        path
+    }
+
+    /// Reads the circuit binary bytes from disk.
+    /// Panics if the file cannot be read.
+    fn circuit_bytes(chain: &ChainInfoOwned) -> Vec<u8> {
+        let path = Self::circuit_path(chain);
+
+        // We unwrap the result here, which will panic if the file is not found or unreadable
+        std::fs::read(&path).expect(&format!(
+            "Failed to read circuit binary at path: {}",
+            path.to_string_lossy()
+        ))
+    }
+}
+
+/// Trait that indicates that the contract can be uploaded.
+pub trait CwOrchUploadCircuit<Chain: ZkTxHandler>:
+    CircuitInstance<Chain> + CircuitUploadable + Sized
+{
+    /// upload the contract to the configured environment.
+    fn upload(&self) -> Result<Chain::Response, CwEnvError> {
+        self.as_circuit().upload_circuit(self)
+    }
+
+    /// upload the contract to the configured environment and specify the permissions for instantiating
+    fn upload_with_access_config(
+        &self,
+        access_config: Option<AccessConfig>,
+    ) -> Result<Chain::Response, CwEnvError> {
+        self.as_circuit()
+            .upload_circuit_with_access_config(self, access_config)
+    }
+}

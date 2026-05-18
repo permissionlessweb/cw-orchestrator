@@ -1,8 +1,8 @@
 use cosmwasm_std::StdResult;
 use std::{io::Cursor, path::PathBuf, str::FromStr};
 
-pub const CW_PLUS_REPO_OWNER: &str = "CosmWasm";
-pub const CW_PLUS_REPO_NAME: &str = "cw-plus";
+pub const CW_PLUSOWNER: &str = "CosmWasm";
+pub const CW_PLUSNAME: &str = "cw-plus";
 pub const CW_PLUS_RELEASE_TAG: &str = "v2.0.0";
 
 pub const ALL_CONTRACTS: &[&str] = &[
@@ -26,7 +26,7 @@ async fn main() -> StdResult<()> {
 
     // We get the release, common for all artifacts
     let release = octocrab::instance()
-        .repos(CW_PLUS_REPO_OWNER, CW_PLUS_REPO_NAME)
+        .repos(CW_PLUSOWNER, CW_PLUSNAME)
         .releases()
         .get_by_tag(CW_PLUS_RELEASE_TAG)
         .await?;

@@ -25,20 +25,20 @@ pub const NOBLE_1: ChainInfo = ChainInfo {
 fn follow_by_tx_hash() -> StdResult<()> {
     dotenv::dotenv()?;
 
-    let dst_chain = ARCHWAY_1;
-    let src_chain = OSMOSIS_1;
+    // let dst_chain = ARCHWAY_1;
+    // let src_chain = OSMOSIS_1;
 
-    let interchain = DaemonInterchain::new(
-        vec![src_chain.clone(), dst_chain],
-        &ChannelCreationValidator,
-    )?;
+    // let interchain = DaemonInterchain::new(
+    //     vec![src_chain.clone(), dst_chain],
+    //     &ChannelCreationValidator,
+    // )?;
 
-    interchain
-        .await_packets_for_txhash(
-            src_chain.chain_id,
-            "D2C5459C54B394C168B8DFA214670FF9E2A0349CCBEF149CF5CB508A5B3BCB84".to_string(),
-        )?
-        .assert()?;
+    // interchain
+    //     .await_packets_for_txhash(
+    //         src_chain.chain_id,
+    //         "D2C5459C54B394C168B8DFA214670FF9E2A0349CCBEF149CF5CB508A5B3BCB84".to_string(),
+    //     )?
+    //     .assert()?;
 
     Ok(())
 }

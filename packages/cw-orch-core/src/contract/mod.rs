@@ -10,5 +10,5 @@ pub use paths::from_workspace as artifacts_dir_from_workspace;
 pub use paths::{ArtifactsDir, WasmPath};
 
 /// ZK circuit integration — feature `terp`.
-#[cfg(feature = "terp")]
+// #[cfg(feature = "terp")]
 pub mod circuits;
