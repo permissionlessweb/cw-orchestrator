@@ -20,6 +20,7 @@ fi
 
 # these are imported by other packages
 BASE_PACKAGES="
+  cw-orch-circuit-derive 
   cw-orch-contract-derive 
   cw-orch-fns-derive
   cw-orch-core

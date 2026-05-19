@@ -116,7 +116,10 @@ pub trait TxHandler: ChainState + Clone {
 pub trait ZkTxHandler: TxHandler {
     /// Store a raw zk-circuit binary (no wasm wrapper).
     /// Corresponds to `terpd tx wasm store-circuit`.
-    fn upload_circuit<T: CircuitUploadable>(&self, circuit_source: &T) -> Result<TxResponse<Self>, CwEnvError>;
+    fn upload_circuit<T: CircuitUploadable>(
+        &self,
+        circuit_source: &T,
+    ) -> Result<Self::Response, CwEnvError>;
 
     /// Store a wasm binary together with its Halo2 verifying key.
     /// Corresponds to `terpd tx wasm store-with-vk`.
@@ -124,14 +127,14 @@ pub trait ZkTxHandler: TxHandler {
         &self,
         wasm_bytes: &[u8],
         vk_bytes: &[u8],
-    ) -> Result<TxResponse<Self>, CwEnvError>;
+    ) -> Result<Self::Response, CwEnvError>;
 
     /// Store a circuit with custom access config (optional extension).
     fn upload_circuit_with_access_config<T: CircuitUploadable>(
         &self,
         circuit_source: &T,
         access_config: Option<AccessConfig>,
-    ) -> Result<TxResponse<Self>, CwEnvError>;
+    ) -> Result<Self::Response, CwEnvError>;
 
     /// Store wasm+vk with custom access config (optional extension).
     fn store_with_vk_and_access_config<T: CircuitUploadable, W: Uploadable>(
@@ -139,7 +142,7 @@ pub trait ZkTxHandler: TxHandler {
         wasm_bytes: &W,
         vk_bytes: &T,
         access_config: Option<AccessConfig>,
-    ) -> Result<TxResponse<Self>, CwEnvError>;
+    ) -> Result<Self::Response, CwEnvError>;
 }
 
 pub enum AccessConfig {

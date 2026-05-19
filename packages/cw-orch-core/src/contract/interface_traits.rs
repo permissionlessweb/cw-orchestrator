@@ -1,5 +1,4 @@
 use super::{Contract, WasmPath};
-use crate::contract::circuits::CircuitInstance;
 use crate::environment::AccessConfig;
 use crate::{
     environment::{
@@ -14,7 +13,6 @@ use cw_multi_test::Contract as MockContract;
 use cw_storage_plus::{Item, Map, PrimaryKey};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-use std::path::PathBuf;
 
 // Fn for custom implementation to return ContractInstance
 /// Interface to the underlying `Contract` struct. Implemented automatically when using our macros.

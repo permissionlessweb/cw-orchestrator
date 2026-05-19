@@ -55,7 +55,7 @@ pub trait CircuitInstance<Chain: ChainState> {
 
 // ── CwOrchCircuitUpload ───────────────────────────────────────────────────────
 
-/// Upload trait for circuit WASM artefacts.
+/// Upload trait for circuit artefacts.
 ///
 /// Mirrors [`crate::contract::interface_traits::CwOrchUpload`].
 /// Requires [`CircuitInstance`] for `zk_id` state tracking and
@@ -72,7 +72,10 @@ pub trait CwOrchCircuitUpload<Chain: ZkTxHandler>:
     fn upload_circuit_with_access_config(
         &self,
         access_config: Option<AccessConfig>,
-    ) -> Result<TxResponse<Chain>, CwEnvError> {
+    ) -> Result<TxResponse<Chain>, CwEnvError>
+    where
+        CwEnvError: From<<Chain as TxHandler>::Error>,
+    {
         self.as_circuit()
             .upload_circuit_with_access_config(self, access_config)
     }
@@ -103,6 +106,27 @@ pub trait CircuitUploadable {
             path.to_string_lossy()
         ))
     }
+    /// Returns the path to the VK combined binary.
+    /// Default: looks in circuit_keys/<circuit_name>/vk_combined.bin
+    fn vk_combined_path(_chain: &ChainInfoOwned) -> PathBuf {
+        let mut path = PathBuf::from("circuit_keys");
+        path.push(Self::circuit_name());
+        path.push("vk_combined.bin");
+        path
+    }
+
+    /// Reads the VK combined binary bytes from disk.
+    /// Panics if the file cannot be read.
+    fn vk_combined_bytes(chain: &ChainInfoOwned) -> Vec<u8> {
+        let path = Self::vk_combined_path(chain);
+        std::fs::read(&path).unwrap_or_else(|e| {
+            panic!(
+                "Failed to read VK combined binary at path {}: {}",
+                path.to_string_lossy(),
+                e
+            )
+        })
+    }
 }
 
 /// Trait that indicates that the contract can be uploaded.
@@ -110,7 +134,10 @@ pub trait CwOrchUploadCircuit<Chain: ZkTxHandler>:
     CircuitInstance<Chain> + CircuitUploadable + Sized
 {
     /// upload the contract to the configured environment.
-    fn upload(&self) -> Result<Chain::Response, CwEnvError> {
+    fn upload(&self) -> Result<Chain::Response, CwEnvError>
+    where
+        CwEnvError: From<<Chain as TxHandler>::Error>,
+    {
         self.as_circuit().upload_circuit(self)
     }
 
@@ -118,7 +145,10 @@ pub trait CwOrchUploadCircuit<Chain: ZkTxHandler>:
     fn upload_with_access_config(
         &self,
         access_config: Option<AccessConfig>,
-    ) -> Result<Chain::Response, CwEnvError> {
+    ) -> Result<Chain::Response, CwEnvError>
+    where
+        CwEnvError: From<<Chain as TxHandler>::Error>,
+    {
         self.as_circuit()
             .upload_circuit_with_access_config(self, access_config)
     }

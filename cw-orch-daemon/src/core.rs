@@ -13,7 +13,11 @@ use cosmrs::{
 };
 use cosmwasm_std::{Addr, Binary, Coin};
 use cw_orch_core::{
-    contract::{interface_traits::Uploadable, WasmPath},
+    contract::{
+        circuits::{circuit_interface_traits::CircuitUploadable, CircuitPath},
+        interface_traits::Uploadable,
+        WasmPath,
+    },
     environment::{
         AccessConfig, AsyncWasmQuerier, ChainInfoOwned, ChainState, IndexResponse, Querier,
     },
@@ -348,7 +352,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         self.upload_with_access_config(uploadable, None).await
     }
     /// Upload a circuit to the chain.
-    pub async fn upload_circuit<T: Uploadable>(
+    pub async fn upload_circuit<T: CircuitUploadable>(
         &self,
         uploadable: &T,
     ) -> Result<CosmTxResponse, DaemonError> {
@@ -357,7 +361,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
     }
 
     /// Upload a contract to the chain and specify the permissions for instantiating
-    pub async fn upload_circuit_with_access_config<T: Uploadable>(
+    pub async fn upload_circuit_with_access_config<T: CircuitUploadable>(
         &self,
         _uploadable: &T,
         access: Option<AccessConfig>,
@@ -367,7 +371,11 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         //     return Err(DaemonError::Unknown);
         // }
 
-        let circuit_path = <T as Uploadable>::wasm(self.chain_info());
+        let circuit_pathbuf = <T as CircuitUploadable>::circuit_path(self.chain_info());
+        let circuit_path = CircuitPath::new(
+            circuit_pathbuf,
+            cw_orch_core::contract::circuits::CircuitSpec::Halo2Plonk,
+        )?;
         log::debug!(target: &transaction_target(), "Uploading file at {:?}", circuit_path);
 
         let result = upload_circuit(self.sender(), circuit_path, access).await?;
@@ -440,16 +448,16 @@ pub async fn upload_wasm<T: TxSender>(
 
 pub async fn upload_circuit<T: TxSender>(
     sender: &T,
-    wasm_path: WasmPath,
+    wasm_path: CircuitPath,
     access: Option<AccessConfig>,
 ) -> Result<CosmTxResponse, DaemonError> {
     let file_contents = std::fs::read(wasm_path.path())?;
     let mut e = write::GzEncoder::new(Vec::new(), Compression::default());
     e.write_all(&file_contents)?;
-    let wasm_byte_code = e.finish()?;
-    let store_msg = cosmrs::cosmwasm::MsgStoreCode {
+
+    let store_msg = cosmrs::cosmwasm::MsgStoreCircuit {
         sender: sender.msg_sender().map_err(Into::into)?,
-        wasm_byte_code,
+        circuit_binary: file_contents,
         instantiate_permission: access.map(access_config_to_cosmrs).transpose()?,
     };
 

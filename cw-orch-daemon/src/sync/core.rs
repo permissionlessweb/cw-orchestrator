@@ -6,12 +6,15 @@ use crate::{
     senders::{builder::SenderBuilder, query::QuerySender},
     CosmTxResponse, DaemonAsyncBase, DaemonBuilder, DaemonError, DaemonState,
 };
-use cosmrs::proto::cosmwasm;
+
 use cosmwasm_std::{Addr, Coin};
 use cw_orch_core::{
-    contract::{interface_traits::Uploadable, WasmPath},
+    contract::{
+        circuits::circuit_interface_traits::CircuitUploadable, interface_traits::Uploadable,
+        WasmPath,
+    },
     environment::{
-        ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler, TxResponse,
+        AccessConfig, ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler,
         ZkTxHandler,
     },
     CwEnvError,
@@ -125,23 +128,6 @@ impl<Sender: QuerySender> DaemonBase<Sender> {
     }
 }
 
-// Helpers for Daemon with [`Wallet`] sender.
-impl Daemon {
-    #[deprecated = "Use `self.sender_mut().set_authz_granter(granter)` or change the sender builder options instead"]
-    /// Specifies wether authz should be used with this daemon
-    pub fn authz_granter(&mut self, granter: &Addr) -> &mut Self {
-        self.sender_mut().set_authz_granter(granter);
-        self
-    }
-
-    #[deprecated = "Use `self.sender_mut().set_fee_granter(granter)` or change the sender builder options instead"]
-    /// Specifies wether feegrant should be used with this daemon
-    pub fn fee_granter(&mut self, granter: &Addr) -> &mut Self {
-        self.sender_mut().set_fee_granter(granter);
-        self
-    }
-}
-
 impl<Sender> ChainState for DaemonBase<Sender> {
     type Out = DaemonState;
 
@@ -151,6 +137,46 @@ impl<Sender> ChainState for DaemonBase<Sender> {
 
     fn can_load_state_from_state_file(&self) -> bool {
         true
+    }
+}
+impl<Sender: TxSender> ZkTxHandler for DaemonBase<Sender> {
+    fn upload_circuit<T: CircuitUploadable>(
+        &self,
+        circuit_source: &T,
+    ) -> Result<CosmTxResponse, CwEnvError> {
+        self.rt_handle
+            .block_on(self.daemon.upload_circuit(circuit_source))
+            .map_err(Into::into)
+    }
+
+    fn store_with_vk(
+        &self,
+        wasm_bytes: &[u8],
+        vk_bytes: &[u8],
+    ) -> Result<CosmTxResponse, CwEnvError> {
+        unimplemented!("TODO: implement zk + wasm upload")
+    }
+
+    fn upload_circuit_with_access_config<T: CircuitUploadable>(
+        &self,
+        circuit_source: &T,
+        access_config: Option<AccessConfig>,
+    ) -> Result<CosmTxResponse, CwEnvError> {
+        self.rt_handle
+            .block_on(
+                self.daemon
+                    .upload_circuit_with_access_config(circuit_source, access_config),
+            )
+            .map_err(Into::into)
+    }
+
+    fn store_with_vk_and_access_config<T: CircuitUploadable, W: Uploadable>(
+        &self,
+        wasm_bytes: &W,
+        vk_bytes: &T,
+        access_config: Option<AccessConfig>,
+    ) -> Result<CosmTxResponse, CwEnvError> {
+        unimplemented!("TODO: implement zk + wasm upload")
     }
 }
 
@@ -251,6 +277,12 @@ impl<Sender: TxSender> TxHandler for DaemonBase<Sender> {
             .block_on(self.sender().bank_send(receiver, amount))
             .map_err(Into::into)
             .map(Into::into)
+    }
+
+    fn call_as(&self, sender: &<Self as TxHandler>::Sender) -> Self {
+        let mut chain = self.clone();
+        chain.set_sender(sender.clone());
+        chain
     }
 }
 

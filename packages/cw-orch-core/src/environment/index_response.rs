@@ -3,7 +3,7 @@ use cw_multi_test::AppResponse;
 #[cfg(feature = "eth")]
 use snailquote::unescape;
 
-const ZK_ID_UPLOAD_EVENT: (&str, &str) = ("upload_circuit", "zkid_id");
+const ZK_ID_UPLOAD_EVENT: (&str, &str) = ("store_circuit", "zkid_id");
 const CODE_ID_UPLOAD_EVENT: (&str, &str) = ("store_code", "code_id");
 const ADDRESS_INSTANTIATE_EVENT: (&str, &str) = ("instantiate", "_contract_address");
 

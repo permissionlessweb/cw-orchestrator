@@ -10,10 +10,10 @@ use std::path::PathBuf;
 use crate::{
     contract::circuits::circuit_interface_traits::CircuitUploadable,
     environment::{
-        AccessConfig, ChainInfoOwned, ChainState, IndexResponse, StateInterface, TxResponse,
-        ZkTxHandler,
+        AccessConfig, ChainInfoOwned, ChainState, IndexResponse, StateInterface, TxHandler,
+        TxResponse, ZkTxHandler,
     },
-    error::CwEnvError,
+    error::{self, CwEnvError},
     log::contract_target,
 };
 
@@ -51,7 +51,7 @@ impl<Chain> Circuit<Chain> {
         &self.chain
     }
 
-    /// Set a fallback `code_id` used when the state store has no entry.
+    /// Set a fallback `zk_id` used when the state store has no entry.
     pub fn set_default_zk_id(&mut self, zk_id: u64) {
         self.default_zk_id = Some(zk_id);
     }
@@ -119,7 +119,10 @@ impl<Chain: ZkTxHandler> Circuit<Chain> {
         &self,
         source: &impl CircuitUploadable,
         access_config: Option<AccessConfig>,
-    ) -> Result<TxResponse<Chain>, CwEnvError> {
+    ) -> Result<TxResponse<Chain>, CwEnvError>
+    where
+        CwEnvError: From<<Chain as TxHandler>::Error>,
+    {
         log::info!(
             target: &contract_target(),
             "[circuit][{}][upload_circuit_with_access_config]",
@@ -145,31 +148,19 @@ impl<Chain: ZkTxHandler> Circuit<Chain> {
     /// Uses `store-with-vk` under the hood.
     pub fn upload_with_vk(
         &self,
-        source: &impl Uploadable,
-        vk_bytes: &[u8],
-    ) -> Result<TxResponse<Chain>, CwEnvError> {
+        _source: &impl Uploadable,
+        _vk_bytes: &[u8],
+    ) -> Result<Chain::Response, Chain::Error> {
         unimplemented!("not yet implemented: uploading with vk")
     }
 
     /// Upload wasm+vk with custom access config.
     pub fn upload_with_vk_and_access_config(
         &self,
-        source: &impl Uploadable,
-        vk_bytes: &[u8],
-        access_config: Option<AccessConfig>,
-    ) -> Result<TxResponse<Chain>, CwEnvError> {
+        _source: &impl Uploadable,
+        _vk_bytes: &[u8],
+        _access_config: Option<AccessConfig>,
+    ) -> Result<Chain::Response, Chain::Error> {
         unimplemented!("not yet implemented: uploading with vk")
-    }
-}
-
-impl<Chain: ChainState> CircuitUploadable for Circuit<Chain> {
-    fn circuit_name() -> String {
-        unimplemented!("todo: mirror how we access wasm circuits paths from the interface")
-    }
-    fn circuit_path(chain: &ChainInfoOwned) -> PathBuf {
-        // Mirror the logic from Uploadable::wasm() but without .wasm extension check
-        let mut path = PathBuf::from("artifacts");
-        path.push(Self::circuit_name());
-        path
     }
 }

@@ -3,7 +3,10 @@ mod tests {
         DaemonAsync contract general tests
     */
 
-    use cw_orch_core::{contract::interface_traits::*, environment::TxHandler};
+    use cw_orch_core::{
+        contract::interface_traits::*,
+        environment::{TxHandler, ZkTxHandler},
+    };
     use cw_orch_mock::Mock;
     use mock_contract::{InstantiateMsg, MigrateMsg, QueryMsg};
 
