@@ -10,9 +10,9 @@ pub const STARGAZE: &str = "stargaze-1";
 pub const JUNO_FUNDS_DENOM: &str = "ujuno";
 
 fn main() {
-//     dotenv().ok();
-//     use dotenv::dotenv;
-//     env_logger::init();
+    // dotenv().ok();
+    // use dotenv::dotenv;
+    // env_logger::init();
 
     // // Depending on binary arguments, we se starship or a rpc based solution (with manual channel creation)
 

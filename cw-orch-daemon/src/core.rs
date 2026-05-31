@@ -224,6 +224,11 @@ impl<Sender> ChainState for DaemonAsyncBase<Sender> {
     fn state(&self) -> Self::Out {
         self.state.clone()
     }
+    // I TURNED THIS ON: @hard-nett
+    fn can_load_state_from_state_file(&self) -> bool {
+        true
+    }
+    
 }
 
 // Execute on the real chain, returns tx response.

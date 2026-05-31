@@ -18,7 +18,7 @@ cw-orch-daemon = { workspace = true }
 async-recursion = "1.1.1"
 base64            = "0.22.1"
 cosmrs            = { workspace = true }
-cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
+cosmwasm-schema = { path = "../../../../cosmwasm/packages/schema" }
 ibc-proto        = { workspace = true }
 tokio = { workspace = true }
 
@@ -42,5 +42,5 @@ dialoguer               = "0.11.0"
 
 anyhow             = { workspace = true }
 cw-orch            = { workspace = true, features = ["daemon"] }
-cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
+cw-orch-interchain = { path = "../../../cw-orch-interchain" }
 pretty_env_logger  = "0.5.0"

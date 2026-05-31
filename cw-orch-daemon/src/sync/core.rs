@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::DerefMut};
+use std::{fmt::Debug, io::Write, ops::DerefMut};
 
 use super::super::senders::Wallet;
 use crate::{
@@ -154,7 +154,26 @@ impl<Sender: TxSender> ZkTxHandler for DaemonBase<Sender> {
         wasm_bytes: &[u8],
         vk_bytes: &[u8],
     ) -> Result<CosmTxResponse, CwEnvError> {
-        unimplemented!("TODO: implement zk + wasm upload")
+        use prost::Message;
+
+        let sender_addr = self.sender_addr();
+        let store_msg = crate::cosmos_modules::cosmwasm::MsgStoreCodeWithCircuit {
+            sender: sender_addr.to_string(),
+            wasm_byte_code: wasm_bytes.to_vec(),
+            vk_byte_code: vk_bytes.to_vec(),
+            instantiate_permission: None,
+        };
+
+        let any_msg = cosmrs::Any {
+            type_url: "/cosmwasm.wasm.v1.MsgStoreCodeWithCircuit".to_string(),
+            value: store_msg.encode_to_vec(),
+        };
+
+        let resp: CosmTxResponse = self
+            .rt_handle
+            .block_on(self.sender().commit_tx_any(vec![any_msg], None))
+            .map_err(Into::<DaemonError>::into)?;
+        Ok(resp)
     }
 
     fn upload_circuit_with_access_config<T: CircuitUploadable>(
@@ -172,11 +191,45 @@ impl<Sender: TxSender> ZkTxHandler for DaemonBase<Sender> {
 
     fn store_with_vk_and_access_config<T: CircuitUploadable, W: Uploadable>(
         &self,
-        wasm_bytes: &W,
-        vk_bytes: &T,
+        _wasm_source: &W,
+        _vk_source: &T,
         access_config: Option<AccessConfig>,
     ) -> Result<CosmTxResponse, CwEnvError> {
-        unimplemented!("TODO: implement zk + wasm upload")
+        use prost::Message;
+
+        // Read wasm file, gzip it (same as upload_wasm)
+        let wasm_path = <W as Uploadable>::wasm(self.chain_info());
+        let file_contents =
+            std::fs::read(wasm_path.path()).map_err(|e| CwEnvError::StdErr(e.to_string()))?;
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder
+            .write_all(&file_contents)
+            .map_err(|e| CwEnvError::StdErr(e.to_string()))?;
+        let wasm_byte_code = encoder
+            .finish()
+            .map_err(|e| CwEnvError::StdErr(e.to_string()))?;
+
+        // Read VK combined bytes
+        let vk_bytes = <T as CircuitUploadable>::vk_combined_bytes(self.chain_info());
+
+        let sender_addr = self.sender_addr();
+        let store_msg = crate::cosmos_modules::cosmwasm::MsgStoreCodeWithCircuit {
+            sender: sender_addr.to_string(),
+            wasm_byte_code,
+            vk_byte_code: vk_bytes,
+            instantiate_permission: access_config.map(Into::into),
+        };
+
+        let any_msg = cosmrs::Any {
+            type_url: "/cosmwasm.wasm.v1.MsgStoreCodeWithCircuit".to_string(),
+            value: store_msg.encode_to_vec(),
+        };
+
+        let resp: CosmTxResponse = self
+            .rt_handle
+            .block_on(self.sender().commit_tx_any(vec![any_msg], None))
+            .map_err(Into::<DaemonError>::into)?;
+        Ok(resp)
     }
 }
 

@@ -1,7 +1,4 @@
 use cosmwasm_std::StdResult;
-use cw_orch::prelude::networks::{LOCAL_JUNO, LOCAL_MIGALOO, LOCAL_OSMO};
-use cw_orch::prelude::*;
-use cw_orch_interchain::prelude::*;
 
 // fn create_daemon_env() -> StdResult<DaemonInterchain> {
 //     // ANCHOR: DAEMON_INTERCHAIN_CREATION

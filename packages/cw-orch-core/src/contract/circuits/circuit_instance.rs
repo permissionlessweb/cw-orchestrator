@@ -5,15 +5,12 @@
 //! On Terp Network the on-chain verifying logic is invoked through the
 //! `zk-wasmvm` host extension, not through a contract address.
 
-use std::path::PathBuf;
-
 use crate::{
     contract::circuits::circuit_interface_traits::CircuitUploadable,
     environment::{
-        AccessConfig, ChainInfoOwned, ChainState, IndexResponse, StateInterface, TxHandler,
-        TxResponse, ZkTxHandler,
+        AccessConfig, ChainState, IndexResponse, StateInterface, TxHandler, TxResponse, ZkTxHandler,
     },
-    error::{self, CwEnvError},
+    error::CwEnvError,
     log::contract_target,
 };
 

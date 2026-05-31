@@ -136,9 +136,8 @@ impl From<String> for ChainKind {
 impl<StringType: Into<String> + Default, StringArrayType: AsRef<[StringType]> + Default>
     ChainInfoBase<StringType, StringArrayType>
 {
-    pub fn config(chain_id: StringType) -> Self {
+    pub fn config() -> Self {
         Self {
-            chain_id,
             ..Default::default()
         }
     }

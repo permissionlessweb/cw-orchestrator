@@ -8,28 +8,28 @@ resolver = "2"
 edition = "2021"
 
 [workspace.dependencies]
-cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "zk-mvp" }
-cw20 = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
-cw20-base = { git = "https://github.com/permissionlessweb/cw-plus", branch = "zk-mvp" }
+cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+cosmwasm-std = { path = "../../cosmwasm/packages/std" }
+cw-storage-plus = { path = "../../cw-storage-plus" }
+cw20 = { path = "../../cw-plus/packages/cw20" }
+cw20-base = { path = "../../cw-plus/contracts/cw20-base" }
 
 anyhow = "1.0"
 log    = "0.4.14"
 serde  = { version = "1.0.103", default-features = false, features = ["derive"] }
 
-cw-orch = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
-cw-orch-interchain = { git = "https://github.com/permissionlessweb/cw-orchestrator", branch = "zk-mvp" }
+cw-orch = { path = "../cw-orch" }
+cw-orch-interchain = { path = "../cw-orch-interchain" }
 
 # Unify crates.io transitive deps with our git forks
 [patch.crates-io]
 
-cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cosmwasm-core = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cosmwasm-crypto = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cosmwasm-derive = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cosmwasm-schema-derive = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cw-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cw-schema-derive = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
-cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "zk-mvp" }
+cosmwasm-std = { path = "../../cosmwasm/packages/std" }
+cosmwasm-core = { path = "../../cosmwasm/packages/core" }
+cosmwasm-crypto = { path = "../../cosmwasm/packages/crypto" }
+cosmwasm-derive = { path = "../../cosmwasm/packages/derive" }
+cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+cosmwasm-schema-derive = { path = "../../cosmwasm/packages/schema-derive" }
+cw-schema = { path = "../../cosmwasm/packages/cw-schema" }
+cw-schema-derive = { path = "../../cosmwasm/packages/cw-schema-derive" }
+cw-storage-plus = { path = "../../cw-storage-plus" }

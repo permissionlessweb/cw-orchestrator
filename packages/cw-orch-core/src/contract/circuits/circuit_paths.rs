@@ -194,10 +194,10 @@ impl CircuitsDir {
         artifact_name: &str,
         spec: CircuitSpec,
     ) -> Result<CircuitPath, CwEnvError> {
-        let path = self
-            .0
-            .join(circuit_name)
-            .join(format!("{}.{}", artifact_name, spec.extension()));
+        let path =
+            self.0
+                .join(circuit_name)
+                .join(format!("{}.{}", artifact_name, spec.extension()));
         CircuitPath::new(path, spec).map_err(|e| {
             CwEnvError::StdErr(format!(
                 "circuit artifact '{artifact_name}' for '{circuit_name}': {e}"
@@ -224,11 +224,27 @@ impl CircuitsDir {
     }
 
     /// Convenience: find the SRS params for a named circuit.
-    pub fn params(
-        &self,
-        circuit_name: &str,
-        spec: CircuitSpec,
-    ) -> Result<CircuitPath, CwEnvError> {
+    pub fn params(&self, circuit_name: &str, spec: CircuitSpec) -> Result<CircuitPath, CwEnvError> {
         self.find_circuit_path(circuit_name, "params", spec)
     }
+}
+
+/// Result of circuit path validation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CircuitPathValidation {
+    /// Combined binary exists with valid footer
+    ValidCombined {
+        path: PathBuf,
+        params_len: u32,
+        vk_len: u32,
+        cs_len: u32,
+        has_cs: bool,
+        has_lookups: bool,
+    },
+    /// Separate keys exist but haven't been combined with footer yet
+    KeysExistButNotCombined { vk_path: PathBuf, pk_path: PathBuf },
+    /// No keys found at all
+    NoKeysFound { searched_dirs: Vec<PathBuf> },
+    /// Combined binary exists but footer is invalid or missing
+    InvalidFooter { path: PathBuf, reason: String },
 }

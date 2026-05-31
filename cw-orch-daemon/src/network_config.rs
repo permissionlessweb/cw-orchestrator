@@ -88,7 +88,7 @@ mod test {
         assert_eq!(chain_info, expected_chain_info);
 
         // It's an actual juno config so we will be able to load it without any issues
-        let daemon_sender = Daemon::builder(ChainInfo::config("abstr-1"))
+        let daemon_sender = Daemon::builder(ChainInfo::config())
             .build_sender(())
             .unwrap();
         assert_eq!(daemon_sender.chain_info().clone(), expected_chain_info);

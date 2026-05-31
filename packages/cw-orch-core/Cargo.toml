@@ -26,6 +26,7 @@ cosmwasm-std  = { workspace = true }
 cw-multi-test = { workspace = true }
 serde         = { workspace = true }
 thiserror     = { workspace = true }
+zk-cosmwasm = { workspace = true }
 
 anyhow     = { workspace = true }
 log        = { workspace = true }

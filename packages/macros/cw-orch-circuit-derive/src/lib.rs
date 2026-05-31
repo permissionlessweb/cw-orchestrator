@@ -251,7 +251,6 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
             }
         }
 
-
         // ─── CircuitInstance ───────────────────────────────────────────────────
         // Required by CwOrchCircuitUpload
         #[cfg(not(target_arch = "wasm32"))]
