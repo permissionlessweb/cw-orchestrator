@@ -28,6 +28,10 @@ edition    = "2021"
 license    = "LGPL-3.0"
 repository = "https://github.com/AbstractSDK/cw-orchestrator"
 
+[workspace.features]
+default = []
+zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm"]
+
 [workspace.dependencies]
 cosmwasm-std = { path = "../cosmwasm/packages/std" }
 cw-storage-plus = { path = "../cw-storage-plus" }
@@ -112,6 +116,7 @@ cosmwasm-schema-derive = { path = "../cosmwasm/packages/schema-derive" }
 cw-schema = { path = "../cosmwasm/packages/cw-schema" }
 cw-schema-derive = { path = "../cosmwasm/packages/cw-schema-derive" }
 cw-storage-plus = { path = "../cw-storage-plus" }
+
 [patch.'https://github.com/permissionlessweb/cw-orchestrator']
 cw-orch = { path = "cw-orch" }
 cw-orch-clone-testing = { path = "packages/clone-testing" }

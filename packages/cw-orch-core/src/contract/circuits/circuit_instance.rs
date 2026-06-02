@@ -79,6 +79,7 @@ impl<Chain: ChainState> Circuit<Chain> {
 }
 
 // ── Chain operations ──────────────────────────────────────────────────────────
+#[cfg(feature = "zk")]
 impl<Chain: ZkTxHandler> Circuit<Chain> {
     /// Upload a raw zk-circuit binary (no wasm wrapper).
     /// Uses `store-circuit` under the hood.

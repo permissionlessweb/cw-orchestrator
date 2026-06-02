@@ -6,18 +6,20 @@ use crate::{
     senders::{builder::SenderBuilder, query::QuerySender, tx::TxSender},
     DaemonAsyncBuilder, DaemonState,
 };
+
 use cosmrs::{
     cosmwasm::{MsgExecuteContract, MsgInstantiateContract, MsgMigrateContract},
     proto::cosmwasm::wasm::v1::MsgInstantiateContract2,
     AccountId, Any, Denom,
 };
 use cosmwasm_std::{Addr, Binary, Coin};
+#[cfg(feature = "zk")]
 use cw_orch_core::{
-    contract::{
-        circuits::{circuit_interface_traits::CircuitUploadable, CircuitPath},
-        interface_traits::Uploadable,
-        WasmPath,
-    },
+    circuits::circuit_interface_traits::CircuitUploadable, contract::circuits::CircuitPath,
+    environment::ZkTxHandler,
+};
+use cw_orch_core::{
+    contract::{interface_traits::Uploadable, WasmPath},
     environment::{
         AccessConfig, AsyncWasmQuerier, ChainInfoOwned, ChainState, IndexResponse, Querier,
     },
@@ -228,7 +230,6 @@ impl<Sender> ChainState for DaemonAsyncBase<Sender> {
     fn can_load_state_from_state_file(&self) -> bool {
         true
     }
-    
 }
 
 // Execute on the real chain, returns tx response.
@@ -357,6 +358,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         self.upload_with_access_config(uploadable, None).await
     }
     /// Upload a circuit to the chain.
+    #[cfg(feature = "zk")]
     pub async fn upload_circuit<T: CircuitUploadable>(
         &self,
         uploadable: &T,
@@ -366,6 +368,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
     }
 
     /// Upload a contract to the chain and specify the permissions for instantiating
+    #[cfg(feature = "zk")]
     pub async fn upload_circuit_with_access_config<T: CircuitUploadable>(
         &self,
         _uploadable: &T,
@@ -377,10 +380,11 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         // }
 
         let circuit_pathbuf = <T as CircuitUploadable>::circuit_path(self.chain_info());
-        let circuit_path = CircuitPath::new(
-            circuit_pathbuf,
-            cw_orch_core::contract::circuits::CircuitSpec::Halo2Plonk,
-        )?;
+        let circuit_path =
+            crate::cw_orch_core::contract::circuits::circuit_paths::CircuitPath::new(
+                circuit_pathbuf,
+                cw_orch_core::contract::circuits::CircuitSpec::Halo2Plonk,
+            )?;
         log::debug!(target: &transaction_target(), "Uploading file at {:?}", circuit_path);
 
         let result = upload_circuit(self.sender(), circuit_path, access).await?;
@@ -451,9 +455,10 @@ pub async fn upload_wasm<T: TxSender>(
         .map_err(Into::into)
 }
 
+#[cfg(feature = "zk")]
 pub async fn upload_circuit<T: TxSender>(
     sender: &T,
-    wasm_path: CircuitPath,
+    wasm_path: crate::cw_orch_core::contract::circuits::circuit_paths::CircuitPath,
     access: Option<AccessConfig>,
 ) -> Result<CosmTxResponse, DaemonError> {
     let file_contents = std::fs::read(wasm_path.path())?;

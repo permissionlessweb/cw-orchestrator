@@ -131,6 +131,7 @@ pub trait CircuitUploadable {
 }
 
 /// Trait that indicates that the contract can be uploaded.
+#[cfg(feature = "zk")]
 pub trait CwOrchUploadCircuit<Chain: ZkTxHandler>:
     CircuitInstance<Chain> + CircuitUploadable + Sized
 {

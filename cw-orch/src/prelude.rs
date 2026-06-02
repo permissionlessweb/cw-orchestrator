@@ -11,13 +11,17 @@
 // 4. Objects that need to be available to implement required traits
 
 // Contract traits
-pub use crate::contract::{
-    circuits::{circuit_interface_traits::CircuitUploadable, CircuitInstance, CwOrchCircuitUpload},
-    interface_traits::{
-        CallAs, ConditionalMigrate, ConditionalUpload, ContractInstance, CwOrchExecute,
-        CwOrchInstantiate, CwOrchMigrate, CwOrchQuery, CwOrchUpload, ExecutableContract,
-        InstantiableContract, MigratableContract, QueryableContract, Uploadable,
+pub use crate::contract::interface_traits::{
+    CallAs, ConditionalMigrate, ConditionalUpload, ContractInstance, CwOrchExecute,
+    CwOrchInstantiate, CwOrchMigrate, CwOrchQuery, CwOrchUpload, ExecutableContract,
+    InstantiableContract, MigratableContract, QueryableContract, Uploadable,
+};
+#[cfg(feature = "zk")]
+pub use crate::{
+    contract::circuits::{
+        circuit_interface_traits::CircuitUploadable, CircuitInstance, CwOrchCircuitUpload,
     },
+    environment::{ZkCwEnv, ZkTxHandler},
 };
 
 pub use cw_orch_core::contract::Deploy;
@@ -31,8 +35,7 @@ pub use crate::environment::IndexResponse;
 // Environment
 pub use crate::environment::{
     BankQuerier, BankSetter, CwEnv, DefaultQueriers, EnvironmentInfo, EnvironmentQuerier,
-    NodeQuerier, QuerierGetter, QueryHandler, TxHandler, TxResponse, WasmQuerier, ZkCwEnv,
-    ZkTxHandler,
+    NodeQuerier, QuerierGetter, QueryHandler, TxHandler, TxResponse, WasmQuerier,
 };
 
 pub use cw_orch_core::environment::Environment;

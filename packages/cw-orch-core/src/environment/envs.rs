@@ -3,8 +3,12 @@
 
 use super::{
     queriers::{bank::BankQuerier, QuerierGetter},
-    QueryHandler, TxHandler, ZkTxHandler,
+    QueryHandler, TxHandler,
 };
+
+#[cfg(feature = "zk")]
+use super::ZkTxHandler;
+
 use cosmwasm_std::{Addr, Coin};
 use cw_utils::NativeBalance;
 
@@ -19,13 +23,17 @@ pub trait CwEnv: TxHandler + QueryHandler + Clone {}
 impl<T: TxHandler + QueryHandler + Clone> CwEnv for T {}
 
 /// Signals a supported execution environment for ZK-CosmWasm contracts
+#[cfg(feature = "zk")]
 pub trait ZkCwEnv: CwEnv + ZkTxHandler {}
+#[cfg(feature = "zk")]
 impl<T: CwEnv + ZkTxHandler> ZkCwEnv for T {}
 
 pub trait MutCwEnv: BankSetter + CwEnv {}
 impl<T> MutCwEnv for T where T: BankSetter + CwEnv {}
 
+#[cfg(feature = "zk")]
 pub trait MutZkCwEnv: BankSetter + ZkCwEnv {}
+#[cfg(feature = "zk")]
 impl<T> MutZkCwEnv for T where T: BankSetter + ZkCwEnv {}
 
 pub trait BankSetter: TxHandler + QuerierGetter<Self::T> {

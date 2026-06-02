@@ -25,13 +25,16 @@ use cosmrs::{
     AccountId, Any,
 };
 use cosmwasm_std::{coin, Addr, Coin};
-use cw_orch_core::{
-    contract::WasmPath,
-    environment::{AccessConfig, ChainInfoOwned, ChainKind, ZkTxHandler},
-    CoreEnvVars, CwEnvError,
-};
 use std::sync::Arc;
 use tonic::transport::Channel;
+
+#[cfg(feature = "zk")]
+use cw_orch_core::environment::ZkTxHandler;
+use cw_orch_core::{
+    contract::WasmPath,
+    environment::{AccessConfig, ChainInfoOwned, ChainKind},
+    CoreEnvVars, CwEnvError,
+};
 
 #[cfg(feature = "eth")]
 use crate::proto::injective::InjectiveSigner;

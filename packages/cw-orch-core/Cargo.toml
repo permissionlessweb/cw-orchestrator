@@ -20,13 +20,14 @@ all-features = true
 default = []
 eth     = ["dep:snailquote"]
 terp    = []
+zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm", "terp"]
 
 [dependencies]
 cosmwasm-std  = { workspace = true }
 cw-multi-test = { workspace = true }
 serde         = { workspace = true }
 thiserror     = { workspace = true }
-zk-cosmwasm = { workspace = true }
+zk-cosmwasm = { workspace = true, optional = true }
 
 anyhow     = { workspace = true }
 log        = { workspace = true }

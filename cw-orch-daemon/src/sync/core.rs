@@ -8,14 +8,14 @@ use crate::{
 };
 
 use cosmwasm_std::{Addr, Coin};
+#[cfg(feature = "zk")]
 use cw_orch_core::{
-    contract::{
-        circuits::circuit_interface_traits::CircuitUploadable, interface_traits::Uploadable,
-        WasmPath,
-    },
+    circuits::circuit_interface_traits::CircuitUploadable, environment::ZkTxHandler,
+};
+use cw_orch_core::{
+    contract::{interface_traits::Uploadable, WasmPath},
     environment::{
         AccessConfig, ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler,
-        ZkTxHandler,
     },
     CwEnvError,
 };
@@ -139,6 +139,8 @@ impl<Sender> ChainState for DaemonBase<Sender> {
         true
     }
 }
+
+#[cfg(feature = "zk")]
 impl<Sender: TxSender> ZkTxHandler for DaemonBase<Sender> {
     fn upload_circuit<T: CircuitUploadable>(
         &self,

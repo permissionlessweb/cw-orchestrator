@@ -6,7 +6,7 @@ mod state;
 mod tx_handler;
 
 pub use chain_info::{ChainInfo, ChainInfoOwned, ChainKind, NetworkInfo, NetworkInfoOwned};
-pub use envs::{BankSetter, CwEnv, Environment, MutCwEnv, MutZkCwEnv, ZkCwEnv};
+pub use envs::{BankSetter, CwEnv, Environment, MutCwEnv};
 pub use index_response::IndexResponse;
 pub use queriers::{
     bank::BankQuerier,
@@ -16,4 +16,10 @@ pub use queriers::{
     DefaultQueriers, Querier, QuerierGetter, QueryHandler,
 };
 pub use state::{ChainState, StateInterface};
-pub use tx_handler::{AccessConfig, TxHandler, TxResponse, ZkTxHandler};
+pub use tx_handler::{AccessConfig, TxHandler, TxResponse};
+
+#[cfg(feature = "zk")]
+pub use {
+    envs::{MutZkCwEnv, ZkCwEnv},
+    tx_handler::ZkTxHandler,
+};

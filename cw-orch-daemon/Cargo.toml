@@ -22,6 +22,7 @@ default = []
 # run with `cargo test --jobs 1 --features node-tests`
 eth        = ["dep:ethers-signers", "dep:ethers-core"]
 node-tests = []
+zk = ["cosmwasm-std/zk"]
 [dependencies]
 # Default deps
 cw-orch-core     = { workspace = true }

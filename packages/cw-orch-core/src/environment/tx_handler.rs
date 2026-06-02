@@ -1,12 +1,8 @@
 //! Transactional traits for execution environments.
 
 use super::{ChainState, IndexResponse};
-use crate::{
-    contract::{
-        circuits::circuit_interface_traits::CircuitUploadable, interface_traits::Uploadable,
-    },
-    error::CwEnvError,
-};
+
+use crate::{contract::interface_traits::Uploadable, error::CwEnvError};
 use cosmwasm_std::{Addr, Binary, Coin};
 use serde::Serialize;
 use std::fmt::Debug;
@@ -113,6 +109,9 @@ pub trait TxHandler: ChainState + Clone {
 ///
 /// Implemented as an extension to avoid modifying cw-orch trait hierarchies,
 /// allowing coexistence with upstream cw-orch while adding fork-specific operations.
+#[cfg(feature = "zk")]
+use crate::contract::circuits::circuit_interface_traits::CircuitUploadable;
+#[cfg(feature = "zk")]
 pub trait ZkTxHandler: TxHandler {
     /// Store a raw zk-circuit binary (no wasm wrapper).
     /// Corresponds to `terpd tx wasm store-circuit`.

@@ -1,6 +1,7 @@
 use crate::networks::{ChainInfo, ChainKind, NetworkInfo};
 
 pub const TERP_LOCAL_CHAIN_ID: &str = "240u-1";
+pub const TERP_LOCAL_CHAIN_ID_B: &str = "240u-2";
 
 pub const TERP_NETWORK: NetworkInfo = NetworkInfo {
     chain_name: "Terp",
@@ -11,9 +12,9 @@ pub const TERP_NETWORK: NetworkInfo = NetworkInfo {
 pub const TERP_TESTNET: ChainInfo = ChainInfo {
     kind: ChainKind::Testnet,
     chain_id: "120u-1",
-    gas_denom: "uthiol",
+    gas_denom: "uterp",
     gas_price: 0.05,
-    grpc_urls: &["http://testnet-grpc.terp.network:9390"],
+    grpc_urls: &["http://192.168.1.104:9390"],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,
@@ -24,7 +25,7 @@ pub const TERP_MAINNET: ChainInfo = ChainInfo {
     chain_id: "morocco-1",
     gas_denom: "uthiol",
     gas_price: 0.05,
-    grpc_urls: &["http://grpc.terp.network:9090"],
+    grpc_urls: &["http://192.168.1.104:9090"],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,
