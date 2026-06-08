@@ -53,19 +53,19 @@ impl GrpcChannel {
                 .await?
                 .into_inner();
 
-            // if node_info.default_node_info.as_ref().unwrap().network != chain_id {
-            //     log::error!(
-            //         "Network mismatch: connection:{} != config:{}",
-            //         node_info.default_node_info.as_ref().unwrap().network,
-            //         chain_id
-            //     );
-            //     log::error!(
-            //         "default:{:#?} != ::: uri: {:#?}",
-            //         node_info.default_node_info,
-            //         uri
-            //     );
-            //     continue;
-            // }
+            if node_info.default_node_info.as_ref().unwrap().network != chain_id {
+                log::error!(
+                    "Network mismatch: connection:{} != config:{}",
+                    node_info.default_node_info.as_ref().unwrap().network,
+                    chain_id
+                );
+                log::error!(
+                    "default:{:#?} != ::: uri: {:#?}",
+                    node_info.default_node_info,
+                    uri
+                );
+                continue;
+            }
 
             // add endpoint to succesful connections
             successful_connections.push(channel);

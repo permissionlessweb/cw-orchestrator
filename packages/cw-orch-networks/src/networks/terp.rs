@@ -45,3 +45,5 @@ pub const TERP_LOCALNET: ChainInfo = ChainInfo {
     lcd_url: None,
     fcd_url: None,
 };
+
+

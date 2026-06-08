@@ -1,5 +1,3 @@
-use prost::bytes::Bytes;
-
 use super::{
     cosmos_modules::{
         abci::{AbciMessageLog, Attribute, StringEvent, TxResponse},

@@ -2,7 +2,9 @@
 //! # Cosmos blockchain networks
 //! Contains information and helpers for different blockchain networks
 //! See [parse_network] to easily retrieve this static network information
+pub mod akash;
 pub mod archway;
+pub mod atone;
 pub mod cosmos;
 pub mod doravota;
 pub mod injective;
@@ -21,7 +23,9 @@ pub mod xion;
 
 #[allow(deprecated)]
 use crate::networks::union::UNION_TESTNET_8;
+pub use akash::{AKASH_MAINNET, AKASH_NETWORK};
 pub use archway::{ARCHWAY_1, CONSTANTINE_3};
+pub use atone::{ATOMEONE_MAINNET, ATOMEONE_NETWORK};
 pub use cosmos::COSMOS_HUB_TESTNET;
 pub use cw_orch_core::environment::{ChainInfo, ChainKind, NetworkInfo};
 pub use doravota::{VOTA_ASH, VOTA_TESTNET};
@@ -88,3 +92,32 @@ pub const SUPPORTED_NETWORKS: &[ChainInfo] = &[
     UNION_TESTNET_8,
     COSMOS_HUB_TESTNET,
 ];
+
+/// Mapping from chain_id to chain_name for known chains
+pub fn chain_name_from_id(chain_id: &str) -> String {
+    let name: &str = match chain_id {
+        "morocco-1" => "terp",
+        "cosmoshub-4" => "cosmoshub",
+        "osmosis-1" => "osmosis",
+        "juno-1" => "juno",
+        "akashnet-2" => "akash",
+        "stargaze-1" => "stargaze",
+        "injective-1" => "injective",
+        "neutron-1" => "neutron",
+        "atomone-1" => "atomone",
+        "regen-1" => "regen",
+        "sei-1" => "sei",
+        "omniflixhub-1" => "omniflix",
+        "passage-2" => "passage3d",
+        "evmos_9001-2" => "evmos",
+        "core-1" => "persistence",
+        "axelar-dojo-1" => "axelar",
+        "noble-1" => "noble",
+        "terra2-1" => "terra2",
+        "kava_2222-10" => "kava",
+        "gitopia" => "gitopia",
+        "secret-4" => "secret",
+        _ => "UNKNOWN",
+    };
+    name.to_string()
+}

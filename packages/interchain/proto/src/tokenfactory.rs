@@ -3,7 +3,7 @@
 use cw_orch_interchain_core::{
     channel::InterchainChannel, IbcQueryHandler, InterchainEnv, InterchainError, NestedPacketsFlow,
 };
-use ibc_proto::ibc::apps::transfer::v1::MsgTransfer;
+use ibc_proto::ibc::applications::transfer::v1::MsgTransfer;
 use osmosis_std::types::osmosis::tokenfactory::v1beta1::{MsgCreateDenom, MsgMint};
 use prost::{Message, Name};
 use tonic::transport::Channel;
