@@ -1,4 +1,4 @@
-pub use artifacts_dir::from_workspace;
+pub use artifacts_dir::{from_workspace};
 pub use artifacts_dir::ArtifactsDir;
 pub use wasm_path::WasmPath;
 

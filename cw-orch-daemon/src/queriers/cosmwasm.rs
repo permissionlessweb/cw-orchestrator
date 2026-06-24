@@ -6,8 +6,8 @@ use crate::{cosmos_modules, error::DaemonError, DaemonBase};
 use cosmrs::proto::cosmos::base::query::v1beta1::PageRequest;
 use cosmrs::AccountId;
 use cosmwasm_std::{
-    from_json, instantiate2_address, to_json_binary, Addr, Checksum, 
-    CodeInfoResponse, ContractInfoResponse,
+    from_json, instantiate2_address, to_json_binary, Addr, Checksum, CodeInfoResponse,
+    ContractInfoResponse,
 };
 use cw_orch_core::environment::Environment;
 use cw_orch_core::{
@@ -164,7 +164,10 @@ impl<Sender: QuerySender> CosmWasmBase<Sender> {
     }
     /// Query code
     #[cfg(feature = "zk")]
-    pub async fn _circuit(&self, zk_id: u64) -> Result<cosmwasm_std::CircuitInfoResponse, DaemonError> {
+    pub async fn _circuit(
+        &self,
+        zk_id: u64,
+    ) -> Result<cosmwasm_std::CircuitInfoResponse, DaemonError> {
         use cosmos_modules::cosmwasm::{query_client::*, QueryCircuitRequest};
         let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
         let request = QueryCircuitRequest { zk_id };
@@ -360,9 +363,9 @@ pub fn cosmrs_to_cosmwasm_code_info(
 #[cfg(feature = "zk")]
 pub fn cosmrs_to_cosmwasm_circuit_info(
     c: cosmrs::proto::cosmwasm::wasm::v1::CircuitInfoResponse,
-) -> CircuitInfoResponse {
+) -> cosmwasm_std::CircuitInfoResponse {
     let checksum: [u8; 32] = c.data_hash.try_into().unwrap();
-    CircuitInfoResponse::new(
+    cosmwasm_std::CircuitInfoResponse::new(
         c.zk_id,
         Addr::unchecked(c.creator),
         Checksum::from(checksum),

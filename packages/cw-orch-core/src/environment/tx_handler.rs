@@ -110,7 +110,7 @@ pub trait TxHandler: ChainState + Clone {
 /// Implemented as an extension to avoid modifying cw-orch trait hierarchies,
 /// allowing coexistence with upstream cw-orch while adding fork-specific operations.
 #[cfg(feature = "zk")]
-use crate::contract::circuits::circuit_interface_traits::CircuitUploadable;
+use crate::circuits::circuit_interface_traits::CircuitUploadable;
 #[cfg(feature = "zk")]
 pub trait ZkTxHandler: TxHandler {
     /// Store a raw zk-circuit binary (no wasm wrapper).

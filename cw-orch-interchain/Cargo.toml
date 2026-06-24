@@ -1,3 +1,4 @@
+
 [package]
 authors     = { workspace = true }
 categories  = ["development-tools"]
@@ -18,21 +19,21 @@ all-features = true
 [features]
 default = []
 # enable the optional dependencies
-daemon = ["cw-orch-interchain-core/daemon", "dep:cw-orch-interchain-daemon"]
-starship = ["daemon", "dep:cw-orch-starship"]
+daemon = ["cw-orch-interchain-core/daemon", "dep:cw-orch-interchain-daemon", "dep:cw-orch-starship"]
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-
-#Used only for testing
-cosmwasm-std.workspace = true
 
 cw-orch-interchain-core     = { workspace = true }
 cw-orch-interchain-daemon   = { workspace = true, optional = true }
 cw-orch-interchain-mock     = { workspace = true }
 cw-orch-starship            = { workspace = true, optional = true }
+ibc-relayer-types.workspace = true
+
+#Used only for testing
+cosmwasm-std.workspace = true
 cw1 = { path = "../../cw-plus/packages/cw1" }
 cw1-whitelist = { path = "../../cw-plus/contracts/cw1-whitelist" }
-ibc-relayer-types.workspace = true
 speculoos.workspace    = true
 
 [dev-dependencies]
@@ -50,4 +51,4 @@ prost-types                 = { workspace = true }
 simple-ica-controller = { path = "../../cw-ibc-demo/contracts/simple-ica-controller" }
 simple-ica-host = { path = "../../cw-ibc-demo/contracts/simple-ica-host" }
 speculoos.workspace         = true
-tokio                       = "1.39.2"
+tokio                       = "1.51.1"

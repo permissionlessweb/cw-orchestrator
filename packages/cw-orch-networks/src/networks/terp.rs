@@ -14,7 +14,7 @@ pub const TERP_TESTNET: ChainInfo = ChainInfo {
     chain_id: "120u-1",
     gas_denom: "uterp",
     gas_price: 0.05,
-    grpc_urls: &["http://192.168.1.104:9390"],
+    grpc_urls: &["https://testnet-grpc.terp.network"],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,

@@ -6,6 +6,9 @@ pub mod environment;
 pub mod build;
 mod error;
 pub mod log;
-pub use error::CwEnvError;
 
+pub use error::CwEnvError;
 pub use serde_json;
+
+// #[cfg(feature = "zk")]
+pub mod circuits;

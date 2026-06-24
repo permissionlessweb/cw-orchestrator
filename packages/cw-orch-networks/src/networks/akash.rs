@@ -12,7 +12,7 @@ pub const AKASH_MAINNET: ChainInfo = ChainInfo {
     chain_id: "akash-1",
     gas_denom: "uakt",
     gas_price: 0.025,
-    grpc_urls: &["https://grpc-akash.ecostake.com:443"],
+    grpc_urls: &["https://akash-grpc.publicnode.com:443"],
     network_info: AKASH_NETWORK,
     lcd_url: None,
     fcd_url: None,

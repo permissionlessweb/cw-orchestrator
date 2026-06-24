@@ -27,15 +27,3 @@ pub use circuit_instance::Circuit;
 pub use circuit_interface_traits::{CircuitInstance, CwOrchCircuitUpload};
 pub use circuit_paths::{CircuitPath, CircuitSpec, CircuitsDir};
 
-// ─── Macro ───────────────────────────────────────────────────────────────────
-
-#[macro_export]
-/// Creates a [`CircuitsDir`] by searching upward from the **call-site crate**
-/// for a `circuit_keys` directory.
-///
-/// Analogous to [`crate::contract::artifacts_dir_from_workspace`].
-macro_rules! circuits_dir_from_workspace {
-    () => {
-        $crate::contract::circuits::CircuitsDir::auto(Some(env!("CARGO_MANIFEST_DIR").to_string()))
-    };
-}

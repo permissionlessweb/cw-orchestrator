@@ -31,7 +31,9 @@ pub mod wasm_protected {
 
     // This re-export should not be touched or the derive macros WILL break
     pub use cw_orch_core as core;
-    pub use cw_orch_core::{build, contract};
+    pub use cw_orch_core::{build, contract,};
+    #[cfg(feature = "zk")]
+    pub use cw_orch_core::{circuits};
 
     /// Related to execution environments
     pub mod environment {

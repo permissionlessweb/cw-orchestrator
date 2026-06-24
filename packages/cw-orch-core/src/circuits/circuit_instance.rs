@@ -6,15 +6,11 @@
 //! `zk-wasmvm` host extension, not through a contract address.
 
 use crate::{
-    contract::circuits::circuit_interface_traits::CircuitUploadable,
-    environment::{
-        AccessConfig, ChainState, IndexResponse, StateInterface, TxHandler, TxResponse, ZkTxHandler,
-    },
+    circuits::circuit_interface_traits::CircuitUploadable,
+    environment::{AccessConfig, ChainState, IndexResponse, StateInterface, TxHandler, TxResponse},
     error::CwEnvError,
     log::contract_target,
 };
-
-use super::super::interface_traits::Uploadable;
 
 /// An uploaded circuit artefact tracked in the cw-orch state store.
 ///
@@ -80,7 +76,7 @@ impl<Chain: ChainState> Circuit<Chain> {
 
 // ── Chain operations ──────────────────────────────────────────────────────────
 #[cfg(feature = "zk")]
-impl<Chain: ZkTxHandler> Circuit<Chain> {
+impl<Chain: crate::environment::ZkTxHandler> Circuit<Chain> {
     /// Upload a raw zk-circuit binary (no wasm wrapper).
     /// Uses `store-circuit` under the hood.
     pub fn upload_circuit(
@@ -146,7 +142,7 @@ impl<Chain: ZkTxHandler> Circuit<Chain> {
     /// Uses `store-with-vk` under the hood.
     pub fn upload_with_vk(
         &self,
-        _source: &impl Uploadable,
+        _source: &impl crate::contract::interface_traits::Uploadable,
         _vk_bytes: &[u8],
     ) -> Result<Chain::Response, Chain::Error> {
         unimplemented!("not yet implemented: uploading with vk")
@@ -155,7 +151,7 @@ impl<Chain: ZkTxHandler> Circuit<Chain> {
     /// Upload wasm+vk with custom access config.
     pub fn upload_with_vk_and_access_config(
         &self,
-        _source: &impl Uploadable,
+        _source: &impl crate::contract::interface_traits::Uploadable,
         _vk_bytes: &[u8],
         _access_config: Option<AccessConfig>,
     ) -> Result<Chain::Response, Chain::Error> {

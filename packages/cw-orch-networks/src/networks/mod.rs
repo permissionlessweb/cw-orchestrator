@@ -25,7 +25,7 @@ pub mod xion;
 use crate::networks::union::UNION_TESTNET_8;
 pub use akash::{AKASH_MAINNET, AKASH_NETWORK};
 pub use archway::{ARCHWAY_1, CONSTANTINE_3};
-pub use atone::{ATOMEONE_MAINNET, ATOMEONE_NETWORK};
+pub use atone::{ATOMEONE_MAINNET, ATOMEONE_TESTNET,ATOMEONE_NETWORK};
 pub use cosmos::COSMOS_HUB_TESTNET;
 pub use cw_orch_core::environment::{ChainInfo, ChainKind, NetworkInfo};
 pub use doravota::{VOTA_ASH, VOTA_TESTNET};

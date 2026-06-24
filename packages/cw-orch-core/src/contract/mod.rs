@@ -1,5 +1,6 @@
 mod contract_instance;
 mod deploy;
+mod ibc_wasm;
 pub mod interface_traits;
 mod paths;
 
@@ -8,7 +9,3 @@ pub use deploy::Deploy;
 
 pub use paths::from_workspace as artifacts_dir_from_workspace;
 pub use paths::{ArtifactsDir, WasmPath};
-
-/// ZK circuit integration — feature `terp`.
-#[cfg(feature = "zk")]
-pub mod circuits;

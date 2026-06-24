@@ -6,12 +6,12 @@
 //! | `CwOrchUpload<C>`       | `CwOrchCircuitUpload<C>`   | Delegates to `Circuit`  |
 
 use crate::{
-    contract::circuits::circuit_paths::CircuitPathValidation,
+    circuits::circuit_paths::CircuitPathValidation,
     environment::{AccessConfig, ChainInfoOwned, ChainState, TxHandler, TxResponse, ZkTxHandler},
     error::CwEnvError,
 };
 use std::path::{Path, PathBuf};
-use zk_cosmwasm::{cosmwasm_circuit::footer_flags, CircuitType};
+use zk_cosmwasm::CircuitType;
 
 use super::circuit_instance::Circuit;
 
@@ -83,50 +83,47 @@ pub trait CwOrchCircuitUpload<Chain: ZkTxHandler>:
 }
 
 /// Trait for uploadable ZK circuit binaries.
-/// Unlike `Uploadable`, this does NOT enforce a `.wasm` file extension.
+///
+/// Updated rules:
+/// - Circuit binaries are always named: `{circuit_name}_vk.bin` and `{circuit_name}_zk.bin`
+/// - All paths are resolved relative to the workspace root (via `artifacts/`),
+///   just like typical CosmWasm workspaces.
 pub trait CircuitUploadable {
-    /// Returns the filename of the circuit binary (without path).
+    /// Returns the base name of the circuit (e.g. "no_rick", "headstash").
     fn circuit_name() -> String;
 
-    /// Returns the path to the circuit binary file.
-    /// Default: looks in artifacts/ directory using circuit_name()
-    fn circuit_path(_chain: &ChainInfoOwned) -> PathBuf {
-        let mut path = PathBuf::from("artifacts");
-        path.push(Self::circuit_name());
-        path
+    fn circuit_path() -> PathBuf {
+        unimplemented!(
+            "no circuit_path. Ensure to implement CircuitUploadable trait for your circuit suite"
+        )
     }
 
-    /// Reads the circuit binary bytes from disk.
-    /// Panics if the file cannot be read.
-    fn circuit_bytes(chain: &ChainInfoOwned) -> Vec<u8> {
-        let path = Self::circuit_path(chain);
-
-        // We unwrap the result here, which will panic if the file is not found or unreadable
-        std::fs::read(&path).expect(&format!(
-            "Failed to read circuit binary at path: {}",
-            path.to_string_lossy()
-        ))
-    }
-    /// Returns the path to the VK combined binary.
-    /// Default: looks in circuit_keys/<circuit_name>/vk_combined.bin
-    fn vk_combined_path(_chain: &ChainInfoOwned) -> PathBuf {
-        let mut path = PathBuf::from("circuit_keys");
-        path.push(Self::circuit_name());
-        path.push("vk_combined.bin");
-        path
+    /// Returns the path to the proving key binary (`{name}_pk.bin`)
+    fn pk_path() -> PathBuf {
+        unimplemented!(
+            "no zk_path. Ensure to implement CircuitUploadable trait for your circuit suite"
+        )
     }
 
-    /// Reads the VK combined binary bytes from disk.
-    /// Panics if the file cannot be read.
-    fn vk_combined_bytes(chain: &ChainInfoOwned) -> Vec<u8> {
-        let path = Self::vk_combined_path(chain);
-        std::fs::read(&path).unwrap_or_else(|e| {
-            panic!(
-                "Failed to read VK combined binary at path {}: {}",
-                path.to_string_lossy(),
-                e
-            )
-        })
+    /// Returns the path to the verifying key binary (`{name}_vk.bin`)
+    fn vk_path() -> PathBuf {
+        unimplemented!(
+            "no vk_path. Ensure to implement CircuitUploadable trait for your circuit suite"
+        )
+    }
+
+    /// Reads the ZK (proving key) binary
+    fn pk_bytes() -> Vec<u8> {
+        unimplemented!(
+            "no zk_bytes. Ensure to implement CircuitUploadable trait for your circuit suite"
+        )
+    }
+
+    /// Reads the VK binary
+    fn vk_bytes() -> Vec<u8> {
+        unimplemented!(
+            "no vk_bytes. Ensure to implement CircuitUploadable trait for your circuit suite"
+        )
     }
 }
 
@@ -162,15 +159,14 @@ use zk_cosmwasm::CircuitFooter;
 /// Trait for validating circuit binary paths and detecting missing footer metadata.
 ///
 /// This trait implements the validation workflow:
-/// 1. Check if `vk_combined.bin` exists with valid footer → ready to deploy
-/// 2. Check if separate `verifying_key.bin` / `proving_key.bin` exist → needs footer append
+/// 1. Check in artifacts for the circuitname_{vk|pk}.bin
+/// 2. check the vk bin contains correct footer metadata
 /// 3. No keys found → needs key generation
 pub trait CircuitPathValidator: CircuitUploadable {
     /// Validate the circuit path and return detailed status
     fn validate_circuit_path(chain: &ChainInfoOwned) -> CircuitPathValidation {
-        let combined_path = Self::vk_combined_path(chain);
+        let combined_path = Self::vk_path();
         let circuit_name = Self::circuit_name();
-
         // Step 1: Check if combined binary exists with valid footer
         if combined_path.exists() {
             return match std::fs::read(&combined_path) {
@@ -236,14 +232,8 @@ pub trait CircuitPathValidator: CircuitUploadable {
             };
         }
 
-        // Step 2: Check if separate keys exist (need footer append)
-        let keys_dir = Self::vk_combined_path(chain)
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .join(format!("{}_keys", circuit_name));
-
-        let vk_path = keys_dir.join("verifying_key.bin");
-        let pk_path = keys_dir.join("proving_key.bin");
+        let vk_path = Self::vk_path();
+        let pk_path = Self::pk_path();
 
         if vk_path.exists() || pk_path.exists() {
             let existing = if vk_path.exists() && pk_path.exists() {
@@ -265,18 +255,17 @@ pub trait CircuitPathValidator: CircuitUploadable {
         }
 
         // Step 3: No keys found at all
-        let circuit_path = Self::circuit_path(chain);
-        let mut searched = vec![combined_path.clone(), keys_dir.clone()];
+        let circuit_path = Self::vk_path();
+        let mut searched = vec![combined_path.clone()];
         if circuit_path.exists() {
             searched.push(circuit_path);
         }
 
         log::error!(
-            "No circuit keys found for '{}'. Searched:\n  - {}\n  - {}\n\
+            "No circuit keys found for '{}'. Searched:\n  - {}\n\
              Generate keys with: cargo run --bin gen_{}_keys",
             circuit_name,
             combined_path.display(),
-            keys_dir.display(),
             circuit_name,
         );
 

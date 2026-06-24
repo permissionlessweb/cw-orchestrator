@@ -18,9 +18,7 @@ pub use crate::contract::interface_traits::{
 };
 #[cfg(feature = "zk")]
 pub use crate::{
-    contract::circuits::{
-        circuit_interface_traits::CircuitUploadable, CircuitInstance, CwOrchCircuitUpload,
-    },
+    circuits::{circuit_interface_traits::CircuitUploadable, CircuitInstance, CwOrchCircuitUpload},
     environment::{ZkCwEnv, ZkTxHandler},
 };
 

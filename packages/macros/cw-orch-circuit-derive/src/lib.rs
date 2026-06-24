@@ -140,7 +140,7 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
         (Some(summary_path), Some(_has_lookups)) => quote!(
             #[cfg(not(target_arch = "wasm32"))]
             impl<Chain: ::cw_orch::core::environment::ChainState>
-                ::cw_orch::core::contract::circuits::circuit_interface_traits::CircuitFooterSpec
+                ::cw_orch::core::circuits::circuit_interface_traits::CircuitFooterSpec
                 for #name<Chain>
             {
                 fn summary_json_path() -> &'static str {
@@ -154,7 +154,7 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
     let struct_def = quote!(
         #[cfg(not(target_arch = "wasm32"))]
         #[derive(::std::clone::Clone)]
-        pub struct #name<Chain>(::cw_orch::core::contract::circuits::Circuit<Chain>);
+        pub struct #name<Chain>(::cw_orch::core::circuits::Circuit<Chain>);
 
         #[cfg(target_arch = "wasm32")]
         #[derive(::std::clone::Clone)]
@@ -165,14 +165,14 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
             /// Constructor for the circuit interface.
             /// Uses the circuit ID as the contract identifier.
             pub fn new(chain: Chain) -> Self {
-            Self(::cw_orch::core::contract::circuits::Circuit::new(#circuit_id, chain))
+            Self(::cw_orch::core::circuits::Circuit::new(#circuit_id, chain))
             }
         }
 
         // ─── CircuitPathValidator ────────────────────────────────────────────
         #[cfg(not(target_arch = "wasm32"))]
         impl<Chain: ::cw_orch::core::environment::ChainState>
-            ::cw_orch::core::contract::circuits::circuit_interface_traits::CircuitPathValidator
+            ::cw_orch::core::circuits::circuit_interface_traits::CircuitPathValidator
             for #name<Chain>
         {}
         // ─── CircuitFooterSpec (conditional) ─────────────────────────────────
@@ -183,71 +183,35 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
         // VK + circuit binary resolution. No .wasm extension enforcement.
         #[cfg(not(target_arch = "wasm32"))]
         impl<Chain: ::cw_orch::core::environment::ChainState>
-            ::cw_orch::core::contract::circuits::circuit_interface_traits::CircuitUploadable
+            ::cw_orch::core::circuits::circuit_interface_traits::CircuitUploadable
             for #name<Chain>
         {
             fn circuit_name() -> ::std::string::String {
                 #circuit_id.to_string()
             }
 
-            fn circuit_path(
-                _chain: &::cw_orch::core::environment::ChainInfoOwned,
-            ) -> ::std::path::PathBuf {
+            fn circuit_path() -> ::std::path::PathBuf {
                 let base = ::std::path::PathBuf::from(#artifacts_dir_expr);
                 if base.is_absolute() {
                     let mut path = base;
-                    path.push(Self::circuit_name());
                     path
                 } else {
                     let mut path = ::std::path::PathBuf::from(::std::env!("CARGO_MANIFEST_DIR"));
                     path.push(base);
-                    path.push(Self::circuit_name());
                     path
                 }
             }
-
-            fn circuit_bytes(
-                chain: &::cw_orch::core::environment::ChainInfoOwned,
-            ) -> ::std::vec::Vec<u8> {
-                let path = Self::circuit_path(chain);
-                ::std::fs::read(&path).unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to read circuit binary at path {}: {}",
-                        path.to_string_lossy(),
-                        e
-                    )
-                })
+            fn vk_path() -> ::std::path::PathBuf {
+                let base = Self::circuit_path();
+                let mut path = base;
+                path.push(format!("{}_vk.bin",Self::circuit_name()));
+                path
             }
-
-            fn vk_combined_path(
-                _chain: &::cw_orch::core::environment::ChainInfoOwned,
-            ) -> ::std::path::PathBuf {
-                let base = ::std::path::PathBuf::from(#vk_dir_expr);
-                if base.is_absolute() {
-                    let mut path = base;
-                    path.push(Self::circuit_name());
-                    path.push("vk_combined.bin");
-                    path
-                } else {
-                    let mut path = ::std::path::PathBuf::from(::std::env!("CARGO_MANIFEST_DIR"));
-                    path.push(base);
-                    path.push(Self::circuit_name());
-                    path.push("vk_combined.bin");
-                    path
-                }
-            }
-
-            fn vk_combined_bytes(
-                chain: &::cw_orch::core::environment::ChainInfoOwned,
-            ) -> ::std::vec::Vec<u8> {
-                let path = Self::vk_combined_path(chain);
-                ::std::fs::read(&path).unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to read VK combined binary at path {}: {}",
-                        path.to_string_lossy(),
-                        e
-                    )
-                })
+            fn pk_path() -> ::std::path::PathBuf {
+                let base = Self::circuit_path();
+                let mut path = base;
+                path.push(format!("{}_pk.bin",Self::circuit_name()));
+                path
             }
         }
 
@@ -258,11 +222,11 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
             ::cw_orch::prelude::CircuitInstance<Chain>
             for #name<Chain>
         {
-            fn as_circuit(&self) -> &::cw_orch::core::contract::circuits::Circuit<Chain> {
+            fn as_circuit(&self) -> &::cw_orch::core::circuits::Circuit<Chain> {
                 &self.0
             }
 
-            fn as_circuit_mut(&mut self) -> &mut ::cw_orch::core::contract::circuits::Circuit<Chain> {
+            fn as_circuit_mut(&mut self) -> &mut ::cw_orch::core::circuits::Circuit<Chain> {
                 &mut self.0
             }
         }
@@ -281,6 +245,28 @@ pub fn circuit_interface(attrs: TokenStream, input: TokenStream) -> TokenStream 
                 ::cw_orch::core::CwEnvError,
             > {
                 self.0.upload_circuit(self)
+            }
+        }
+
+        // === Inherent Helper - available in more contexts ===
+        #[cfg(not(target_arch = "wasm32"))]
+        impl<Chain> #name<Chain> {
+            /// Returns the workspace `artifacts/` directory.
+            /// Always available on host (non-wasm) builds.
+            pub fn artifacts_dir() -> ::std::path::PathBuf {
+                let mut current = ::std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                loop {
+                    let artifacts = current.join("artifacts");
+                    if artifacts.exists() {
+                        return artifacts;
+                    }
+                    if !current.pop() {
+                        panic!(
+                            "Could not find workspace `artifacts/` directory for circuit '{}'",
+                            #circuit_id
+                        );
+                    }
+                }
             }
         }
     );

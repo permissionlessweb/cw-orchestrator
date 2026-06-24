@@ -17,7 +17,7 @@ exclude = [".env"]
 all-features = true
 
 [features]
-default = []
+default = ["zk"]
 eth     = ["dep:snailquote"]
 terp    = []
 zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm", "terp"]

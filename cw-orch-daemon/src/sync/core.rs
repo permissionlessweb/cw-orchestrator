@@ -1,4 +1,4 @@
-use std::{fmt::Debug,  ops::DerefMut};
+use std::{fmt::Debug, ops::DerefMut};
 
 use super::super::senders::Wallet;
 use crate::{
@@ -10,14 +10,13 @@ use crate::{
 use cosmwasm_std::{Addr, Coin};
 #[cfg(feature = "zk")]
 use cw_orch_core::{
-    circuits::circuit_interface_traits::CircuitUploadable, environment::ZkTxHandler,
+    circuits::circuit_interface_traits::CircuitUploadable,
+    environment::{AccessConfig, ZkTxHandler},
+    CwEnvError,
 };
 use cw_orch_core::{
     contract::{interface_traits::Uploadable, WasmPath},
-    environment::{
-         ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler,
-    },
- 
+    environment::{ChainInfoOwned, ChainState, DefaultQueriers, QueryHandler, TxHandler},
 };
 use cw_orch_traits::stargate::Stargate;
 use serde::Serialize;
@@ -204,21 +203,18 @@ impl<Sender: TxSender> ZkTxHandler for DaemonBase<Sender> {
         let file_contents =
             std::fs::read(wasm_path.path()).map_err(|e| CwEnvError::StdErr(e.to_string()))?;
         let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-        encoder
-            .write_all(&file_contents)
+        std::io::Write::write_all(&mut encoder, &file_contents)
             .map_err(|e| CwEnvError::StdErr(e.to_string()))?;
         let wasm_byte_code = encoder
             .finish()
             .map_err(|e| CwEnvError::StdErr(e.to_string()))?;
 
         // Read VK combined bytes
-        let vk_bytes = <T as CircuitUploadable>::vk_combined_bytes(self.chain_info());
-
         let sender_addr = self.sender_addr();
         let store_msg = crate::cosmos_modules::cosmwasm::MsgStoreCodeWithCircuit {
             sender: sender_addr.to_string(),
             wasm_byte_code,
-            vk_byte_code: vk_bytes,
+            vk_byte_code: <T as CircuitUploadable>::vk_bytes(),
             instantiate_permission: access_config.map(Into::into),
         };
 

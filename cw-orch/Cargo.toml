@@ -22,7 +22,7 @@ default = []
 daemon           = ["dep:tokio", "dep:cosmrs", "dep:cw-orch-daemon", "dep:cw-orch-networks"]
 eth              = ["daemon", "cw-orch-core/eth", "cw-orch-daemon?/eth"]
 snapshot-testing = ["dep:insta", "dep:sanitize-filename"]
-zk               = ["cosmwasm-std/zk", "cw-orch-core/zk"]
+zk               = ["cosmwasm-std/zk", "cw-orch-core/zk",  "cw-orch-daemon/zk"]
 
 [dependencies]
 # Derive
