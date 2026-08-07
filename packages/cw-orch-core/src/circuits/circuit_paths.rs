@@ -201,14 +201,15 @@ impl CircuitsDir {
 /// Result of circuit path validation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CircuitPathValidation {
-    /// Combined binary exists with valid footer
+    /// Combined binary exists with valid footer (`zk_cosmwasm::CircuitFooter`).
     ValidCombined {
         path: PathBuf,
-        params_len: u32,
+        /// Matches footer field `param_len` (not the older `params_len` spelling).
+        param_len: u32,
         vk_len: u32,
         cs_len: u32,
+        /// Derived as `cs_len > 0` (footer no longer carries HAS_CS flags).
         has_cs: bool,
-        has_lookups: bool,
     },
     /// Separate keys exist but haven't been combined with footer yet
     KeysExistButNotCombined { vk_path: PathBuf, pk_path: PathBuf },
