@@ -16,6 +16,64 @@ exclude = [".env"]
 # passes all-features to cargo when building the docs.
 all-features = true
 
+[features]
+default = []
+# enable the optional dependencies
+daemon           = ["dep:tokio", "dep:cosmrs", "dep:cw-orch-daemon", "dep:cw-orch-networks"]
+eth              = ["daemon", "cw-orch-core/eth", "cw-orch-daemon?/eth"]
+snapshot-testing = ["dep:insta", "dep:sanitize-filename"]
+zk               = ["cosmwasm-std/zk", "cw-orch-core/zk",  "cw-orch-daemon/zk"]
+
+[dependencies]
+# Derive
+cw-orch-circuit-derive  = { workspace = true }
+cw-orch-contract-derive = { workspace = true }
+cw-orch-fns-derive      = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+
+# Default deps
+anyhow       = { workspace = true }
+
+# Daemon deps
+cosmrs           = { workspace = true, features = ["dev", "cosmwasm", "grpc"], optional = true }
+cosmwasm-std = { workspace = true }
+
+# Env deps
+# This packages will most likely make wasm not compilable
+cw-orch-core   = { workspace = true }
+cw-orch-daemon = { workspace = true, optional = true }
+cw-orch-mock   = { workspace = true }
+cw-orch-networks = { workspace = true, optional = true }
+cw-orch-traits = { workspace = true }
+cw-utils     = { workspace = true }
+hex          = "0.4.3"
+
+# Snapshot deps
+insta             = { version = "1.39.0", features = ["yaml"], optional = true }
+log          = { workspace = true }
+sanitize-filename = { version = "0.5.0", optional = true }
+schemars = "0.8"
+serde        = { workspace = true }
+thiserror    = { workspace = true }
+tokio            = { workspace = true, features = ["full"], optional = true }
+
+# Live mock deps
+tonic = { workspace = true, optional = true, features = ["transport"] }
+
+[dev-dependencies]
+cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+counter-contract  = { path = "../contracts-ws/contracts/counter" }
+cw-orch = { path = "." }
+dotenv            = "0.15.0"
+env_logger        = "0.11.5"
+mock-contract     = { path = "../contracts-ws/contracts/mock_contract" }
+mock-contract-u64 = { path = "../contracts-ws/contracts/mock_contract_u64" }
+osmosis-std = { path = "../../osmosis-rust/packages/osmosis-std" }
+prost             = { workspace = true }
+prost-types       = { workspace = true }
+serde_json        = { workspace = true }
+
 [[example]]
 name              = "local_daemon"
 required-features = ["daemon"]
@@ -37,60 +95,3 @@ required-features = ["daemon"]
 name              = "testnet_queries"
 path              = "examples/queries/testnet_queries.rs"
 required-features = ["daemon"]
-
-[features]
-default = []
-# enable the optional dependencies
-daemon           = ["dep:tokio", "dep:cosmrs", "dep:cw-orch-daemon", "dep:cw-orch-networks"]
-eth              = ["daemon", "cw-orch-core/eth", "cw-orch-daemon?/eth"]
-snapshot-testing = ["dep:insta", "dep:sanitize-filename"]
-
-[dependencies]
-# Derive
-cw-orch-contract-derive = { workspace = true }
-cw-orch-fns-derive      = { workspace = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-
-# Daemon deps
-cosmrs           = { workspace = true, features = ["dev", "cosmwasm", "grpc"], optional = true }
-cw-orch-networks = { workspace = true, optional = true }
-tokio            = { workspace = true, features = ["full"], optional = true }
-
-# Live mock deps
-tonic = { workspace = true, optional = true, features = ["transport"] }
-
-
-# Snapshot deps
-insta             = { version = "1.39.0", features = ["yaml"], optional = true }
-sanitize-filename = { version = "0.5.0", optional = true }
-
-# Default deps
-anyhow       = { workspace = true }
-cosmwasm-std = { workspace = true }
-cw-utils     = { workspace = true }
-hex          = "0.4.3"
-log          = { workspace = true }
-schemars = "0.8.4"
-serde        = { workspace = true }
-thiserror    = { workspace = true }
-
-# Env deps
-# This packages will most likely make wasm not compilable
-cw-orch-core   = { workspace = true }
-cw-orch-daemon = { workspace = true, optional = true }
-cw-orch-mock   = { workspace = true }
-cw-orch-traits = { workspace = true }
-
-[dev-dependencies]
-cosmwasm-schema   = "3.0.0"
-counter-contract  = { path = "../contracts-ws/contracts/counter" }
-cw-orch           = { features = ["daemon", "snapshot-testing"], path = "." }
-dotenv            = "0.15.0"
-env_logger        = "0.11.5"
-mock-contract     = { path = "../contracts-ws/contracts/mock_contract" }
-mock-contract-u64 = { path = "../contracts-ws/contracts/mock_contract_u64" }
-osmosis-std       = { git = "https://github.com/permissionlessweb/osmosis-rust" }
-prost             = { workspace = true }
-prost-types       = { workspace = true }
-serde_json        = { workspace = true }

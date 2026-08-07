@@ -63,13 +63,13 @@ mod interfaces {
         IncreaseAllowance {
             spender: String,
             amount: Coin,
-            expires: Option<cw_utils::Expiration>,
+            expires: Option<cw20::Expiration>,
         },
         /// Decreases an allowance for a given subkey (subkey must not be admin)
         DecreaseAllowance {
             spender: String,
             amount: Coin,
-            expires: Option<cw_utils::Expiration>,
+            expires: Option<cw20::Expiration>,
         },
 
         // Setups up permissions for a given subkey.

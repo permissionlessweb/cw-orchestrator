@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 
 // macros
+pub use cw_orch_circuit_derive::circuit_interface;
 pub use cw_orch_contract_derive::interface;
 pub use cw_orch_fns_derive::{ExecuteFns, QueryFns};
 
@@ -30,7 +31,9 @@ pub mod wasm_protected {
 
     // This re-export should not be touched or the derive macros WILL break
     pub use cw_orch_core as core;
-    pub use cw_orch_core::{build, contract};
+    pub use cw_orch_core::{build, contract,};
+    #[cfg(feature = "zk")]
+    pub use cw_orch_core::{circuits};
 
     /// Related to execution environments
     pub mod environment {

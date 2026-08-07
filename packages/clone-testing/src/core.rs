@@ -1,5 +1,5 @@
-use std::{cell::RefCell, fmt::Debug, io::Read, rc::Rc};
-
+use crate::{contract::CloneTestingContract, queriers::bank::CloneBankQuerier};
+use clone_cw_multi_test::wasm_emulation::query::ContainsRemote;
 use clone_cw_multi_test::{
     addons::{MockAddressGenerator, MockApiBech32},
     wasm_emulation::{channel::RemoteChannel, storage::analyzer::StorageAnalyzer},
@@ -20,9 +20,8 @@ use cw_orch_core::{
 use cw_orch_daemon::{queriers::Node, read_network_config, DEFAULT_DEPLOYMENT, RUNTIME};
 use cw_utils::NativeBalance;
 use serde::Serialize;
+use std::{cell::RefCell, fmt::Debug, io::Read, rc::Rc};
 use tokio::runtime::Runtime;
-
-use crate::{contract::CloneTestingContract, queriers::bank::CloneBankQuerier};
 
 use super::state::MockState;
 
@@ -36,7 +35,7 @@ pub type CloneTestingApp = App<BankKeeper, MockApiBech32>;
 ///
 /// ## Example
 /// ```
-/// # use cosmwasm_std::{Addr, coin, Uint128};
+/// # use cosmwasm_std::{Addr, coin, Uint256};
 /// use cw_orch_clone_testing::CloneTesting;
 /// use cw_orch_core::environment::TxHandler;
 ///
@@ -48,8 +47,8 @@ pub type CloneTestingApp = App<BankKeeper, MockApiBech32>;
 /// mock.set_balance(&sender, vec![coin(100u128, "token")]).unwrap();
 ///
 /// // query the balance
-/// let balance: Uint128 = mock.query_balance(&sender, "token").unwrap();
-/// assert_eq!(balance.u128(), 100u128);
+/// let balance: Uint256 = mock.query_balance(&sender, "token").unwrap();
+/// assert_eq!(balance, Uint256::new(100u128));
 /// ```
 ///
 /// ## Example with custom state
@@ -78,8 +77,11 @@ pub struct CloneTesting<S: StateInterface = MockState> {
 
 impl CloneTesting {
     /// Ceates a new valid account
-    pub fn init_account(&self) -> Addr {
-        self.app.borrow_mut().next_address()
+    pub fn init_account(&self, name: Option<&str>) -> Addr {
+        self.app
+            .borrow_mut()
+            .api()
+            .addr_make(name.unwrap_or("cade"))
     }
 
     /// Set the bank balance of an address.
@@ -247,8 +249,8 @@ impl<S: StateInterface> CloneTesting<S> {
             .with_block(block_info)
             .with_remote(remote_channel.clone());
 
-        let app = Rc::new(RefCell::new(app.build(|_, _, _| {})?));
-        let sender = app.borrow_mut().next_address();
+        let app = Rc::new(RefCell::new(app.build(|_, _, _| {})));
+        let sender = app.borrow_mut().api().addr_make("xiti");
 
         Ok(Self {
             chain,
@@ -510,7 +512,7 @@ impl BankSetter for CloneTesting {
 #[cfg(test)]
 mod test {
     use crate::core::*;
-    use clone_cw_multi_test::LOCAL_RUST_CODE_OFFSET;
+    use clone_cw_multi_test::LOCAL_CODE_OFFSET;
     use cosmwasm_std::{
         to_json_binary, Addr, Coin, Deps, DepsMut, Env, MessageInfo, Response, Uint128,
     };
@@ -571,7 +573,7 @@ mod test {
         let chain = CloneTesting::new(chain_info)?;
 
         let sender = chain.sender_addr();
-        let recipient = &chain.init_account();
+        let recipient = &chain.init_account(None);
 
         chain
             .set_balance(recipient, vec![Coin::new(amount, denom)])
@@ -587,7 +589,7 @@ mod test {
             .is_equal_to(chain.sender_addr());
 
         let init_res = chain.upload(&MockCw20).unwrap();
-        let code_id = (1 + LOCAL_RUST_CODE_OFFSET) as u64;
+        let code_id = (1 + LOCAL_CODE_OFFSET) as u64;
         asserting("contract initialized properly")
             .that(&init_res.events[0].attributes[0].value)
             .is_equal_to(code_id.to_string());
@@ -655,7 +657,7 @@ mod test {
         let mock_state = MockState::new(JUNO_1.into(), "default_id");
 
         let chain: CloneTesting = CloneTesting::<_>::new_custom(&rt, chain, mock_state)?;
-        let recipient = chain.init_account();
+        let recipient = chain.init_account(None);
 
         chain
             .set_balances(&[(&recipient, &[Coin::new(amount, denom)])])
@@ -702,7 +704,7 @@ mod test {
         let chain_info = JUNO_1;
 
         let chain = CloneTesting::new(chain_info)?;
-        let recipient = &chain.init_account();
+        let recipient = &chain.init_account(None);
 
         // Send both denoms at once
         let coins = denoms

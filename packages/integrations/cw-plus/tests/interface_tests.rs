@@ -259,7 +259,7 @@ mod cw4_stake {
 }
 
 mod cw20_base {
-    use cosmwasm_std::{Uint128, Uint256};
+    use cosmwasm_std::{Uint256};
     use cw20::MinterResponse;
     use cw_orch::{mock::Mock, prelude::*};
     use cw_plus_orch::cw20_base::{
@@ -313,7 +313,7 @@ mod cw20_base {
 }
 
 mod cw20_ics {
-    use cosmwasm_std::{coins, to_json_binary, Uint128, Uint256};
+    use cosmwasm_std::{coins, to_json_binary, Uint256};
     use cw20::MinterResponse;
     use cw20_base::msg::InstantiateMsg;
     use cw20_ics20::{
@@ -398,7 +398,8 @@ mod cw20_ics {
             .get_ordered_ports_from("juno-1")
             .unwrap();
         let channels = cw20_ics20.list_channels().unwrap().channels;
-        let expected_channel_id = channel.0.channel.unwrap().to_string();
+        let expected_channel_id = channel.0.channel.clone().unwrap().to_string();
+        let stargaze_channel_id = channel.1.channel.clone().unwrap().to_string();
         assert_eq!(channels[0].id, expected_channel_id);
 
         let user_juno = juno.addr_make("juno");
@@ -432,17 +433,23 @@ mod cw20_ics {
         interchain
             .await_and_check_packets("juno-1", response)
             .unwrap();
-        let mut balances = Vec::new();
-        let balance1 = stargaze
-            .balance(&user_stargaze, Some("cw20".into()))
-            .unwrap();
-        balances.extend(balance1);
-        let balance2 = stargaze
-            .balance(&user_stargaze, Some("denom".into()))
-            .unwrap();
-        balances.extend(balance2);
+        let cw20_ibc_denom = stargaze.app.borrow().wrap_ibc_denom(
+            &stargaze_channel_id,
+            &format!("cw20:{}", cw20.addr_str().unwrap()),
+        );
+        let native_ibc_denom = stargaze
+            .app
+            .borrow()
+            .wrap_ibc_denom(&stargaze_channel_id, "denom");
 
-        assert_eq!(balances[0].amount, Uint256::new(100));
-        assert_eq!(balances[1].amount, Uint256::new(200));
+        let balance1 = stargaze
+            .balance(&user_stargaze, Some(cw20_ibc_denom))
+            .unwrap();
+        let balance2 = stargaze
+            .balance(&user_stargaze, Some(native_ibc_denom))
+            .unwrap();
+
+        assert_eq!(balance1[0].amount, Uint256::new(100));
+        assert_eq!(balance2[0].amount, Uint256::new(200));
     }
 }

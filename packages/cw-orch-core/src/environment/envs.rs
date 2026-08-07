@@ -5,6 +5,10 @@ use super::{
     queriers::{bank::BankQuerier, QuerierGetter},
     QueryHandler, TxHandler,
 };
+
+#[cfg(feature = "zk")]
+use super::ZkTxHandler;
+
 use cosmwasm_std::{Addr, Coin};
 use cw_utils::NativeBalance;
 
@@ -18,8 +22,19 @@ pub trait Environment<Chain> {
 pub trait CwEnv: TxHandler + QueryHandler + Clone {}
 impl<T: TxHandler + QueryHandler + Clone> CwEnv for T {}
 
+/// Signals a supported execution environment for ZK-CosmWasm contracts
+#[cfg(feature = "zk")]
+pub trait ZkCwEnv: CwEnv + ZkTxHandler {}
+#[cfg(feature = "zk")]
+impl<T: CwEnv + ZkTxHandler> ZkCwEnv for T {}
+
 pub trait MutCwEnv: BankSetter + CwEnv {}
 impl<T> MutCwEnv for T where T: BankSetter + CwEnv {}
+
+#[cfg(feature = "zk")]
+pub trait MutZkCwEnv: BankSetter + ZkCwEnv {}
+#[cfg(feature = "zk")]
+impl<T> MutZkCwEnv for T where T: BankSetter + ZkCwEnv {}
 
 pub trait BankSetter: TxHandler + QuerierGetter<Self::T> {
     type T: BankQuerier<Error = Self::Error>;
@@ -35,8 +50,13 @@ pub trait BankSetter: TxHandler + QuerierGetter<Self::T> {
         address: &Addr,
         amount: Vec<Coin>,
     ) -> Result<(), <Self as TxHandler>::Error> {
-        // Query the current balance of the account
-        let current_balance = QuerierGetter::<Self::T>::querier(self).balance(address, None)?;
+        // Query the current balance for each denom being added
+        let querier = QuerierGetter::<Self::T>::querier(self);
+        let mut current_balance = Vec::new();
+        for coin in &amount {
+            let balance = querier.balance(address, Some(coin.denom.clone()))?;
+            current_balance.extend(balance);
+        }
         let future_balance = NativeBalance(current_balance) + NativeBalance(amount);
         // Set the balance with more funds
         self.set_balance(address, future_balance.into_vec())?;

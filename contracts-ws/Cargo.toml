@@ -8,14 +8,28 @@ resolver = "2"
 edition = "2021"
 
 [workspace.dependencies]
-cosmwasm-std    = "3.0.1"
-cw-storage-plus = { version = "3.0.0" }
-cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
-cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
+cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+cosmwasm-std = { path = "../../cosmwasm/packages/std" }
+cw-storage-plus = { path = "../../cw-storage-plus" }
+cw20 = { path = "../../cw-plus/packages/cw20" }
+cw20-base = { path = "../../cw-plus/contracts/cw20-base" }
 
 anyhow = "1.0"
 log    = "0.4.14"
 serde  = { version = "1.0.103", default-features = false, features = ["derive"] }
 
-cw-orch            = { path = "../cw-orch", version = "0.30.0" }
-cw-orch-interchain = { path = "../cw-orch-interchain", version = "0.8.1" }
+cw-orch = { path = "../cw-orch" }
+cw-orch-interchain = { path = "../cw-orch-interchain" }
+
+# Unify crates.io transitive deps with our git forks
+[patch.crates-io]
+
+cosmwasm-std = { path = "../../cosmwasm/packages/std" }
+cosmwasm-core = { path = "../../cosmwasm/packages/core" }
+cosmwasm-crypto = { path = "../../cosmwasm/packages/crypto" }
+cosmwasm-derive = { path = "../../cosmwasm/packages/derive" }
+cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+cosmwasm-schema-derive = { path = "../../cosmwasm/packages/schema-derive" }
+cw-schema = { path = "../../cosmwasm/packages/cw-schema" }
+cw-schema-derive = { path = "../../cosmwasm/packages/cw-schema-derive" }
+cw-storage-plus = { path = "../../cw-storage-plus" }

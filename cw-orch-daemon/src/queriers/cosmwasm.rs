@@ -162,6 +162,24 @@ impl<Sender: QuerySender> CosmWasmBase<Sender> {
 
         Ok(cosmrs_to_cosmwasm_code_info(response))
     }
+    /// Query code
+    #[cfg(feature = "zk")]
+    pub async fn _circuit(
+        &self,
+        zk_id: u64,
+    ) -> Result<cosmwasm_std::CircuitInfoResponse, DaemonError> {
+        use cosmos_modules::cosmwasm::{query_client::*, QueryCircuitRequest};
+        let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
+        let request = QueryCircuitRequest { zk_id };
+        let response = client
+            .circuit(request)
+            .await?
+            .into_inner()
+            .circuit_info
+            .unwrap();
+
+        Ok(cosmrs_to_cosmwasm_circuit_info(response))
+    }
 
     /// Query code bytes
     pub async fn _code_data(&self, code_id: u64) -> Result<Vec<u8>, DaemonError> {
@@ -169,6 +187,15 @@ impl<Sender: QuerySender> CosmWasmBase<Sender> {
         let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
         let request = QueryCodeRequest { code_id };
         Ok(client.code(request).await?.into_inner().data)
+    }
+
+    /// Query circuit bytes
+    #[cfg(feature = "zk")]
+    pub async fn _circuit_data(&self, zk_id: u64) -> Result<Vec<u8>, DaemonError> {
+        use cosmos_modules::cosmwasm::{query_client::*, QueryCircuitRequest};
+        let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
+        let request = QueryCircuitRequest { zk_id };
+        Ok(client.circuit(request).await?.into_inner().data)
     }
 
     /// Query codes
@@ -195,6 +222,16 @@ impl<Sender: QuerySender> CosmWasmBase<Sender> {
         let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
         let request = QueryPinnedCodesRequest { pagination: None };
         Ok(client.pinned_codes(request).await?.into_inner())
+    }
+    /// Query pinned circutis (circuits live in storage)
+    #[cfg(feature = "zk")]
+    pub async fn _pinned_circuits(
+        &self,
+    ) -> Result<cosmos_modules::cosmwasm::QueryPinnedCircuitsResponse, DaemonError> {
+        use cosmos_modules::cosmwasm::{query_client::*, QueryPinnedCircuitsRequest};
+        let mut client: QueryClient<Channel> = QueryClient::new(self.channel.clone());
+        let request = QueryPinnedCircuitsRequest { pagination: None };
+        Ok(client.pinned_circuits(request).await?.into_inner())
     }
 
     /// Query contracts by code
@@ -319,6 +356,18 @@ pub fn cosmrs_to_cosmwasm_code_info(
     CodeInfoResponse::new(
         code_info.code_id,
         Addr::unchecked(code_info.creator),
+        Checksum::from(checksum),
+    )
+}
+
+#[cfg(feature = "zk")]
+pub fn cosmrs_to_cosmwasm_circuit_info(
+    c: cosmrs::proto::cosmwasm::wasm::v1::CircuitInfoResponse,
+) -> cosmwasm_std::CircuitInfoResponse {
+    let checksum: [u8; 32] = c.data_hash.try_into().unwrap();
+    cosmwasm_std::CircuitInfoResponse::new(
+        c.zk_id,
+        Addr::unchecked(c.creator),
         Checksum::from(checksum),
     )
 }

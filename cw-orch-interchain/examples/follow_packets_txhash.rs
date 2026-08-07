@@ -1,26 +1,6 @@
 use cosmwasm_std::StdResult;
-use cw_orch::{
-    daemon::networks::ARCHWAY_1,
-    environment::{ChainInfo, NetworkInfo},
-    prelude::networks::osmosis::OSMOSIS_1,
-};
+use cw_orch::daemon::networks::{ARCHWAY_1, OSMOSIS_1};
 use cw_orch_interchain::prelude::*;
-
-pub const NOBLE: NetworkInfo = NetworkInfo {
-    chain_name: "noble",
-    pub_address_prefix: "noble",
-    coin_type: 118,
-};
-pub const NOBLE_1: ChainInfo = ChainInfo {
-    chain_id: "noble-1",
-    gas_denom: "uusdc",
-    gas_price: 0.1,
-    grpc_urls: &["http://noble-grpc.polkachu.com:21590"],
-    lcd_url: None,
-    fcd_url: None,
-    network_info: NOBLE,
-    kind: cw_orch::environment::ChainKind::Mainnet,
-};
 
 fn follow_by_tx_hash() -> StdResult<()> {
     dotenv::dotenv()?;

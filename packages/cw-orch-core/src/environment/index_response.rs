@@ -3,6 +3,7 @@ use cw_multi_test::AppResponse;
 #[cfg(feature = "eth")]
 use snailquote::unescape;
 
+const ZK_ID_UPLOAD_EVENT: (&str, &str) = ("store_circuit", "zkid_id");
 const CODE_ID_UPLOAD_EVENT: (&str, &str) = ("store_code", "code_id");
 const ADDRESS_INSTANTIATE_EVENT: (&str, &str) = ("instantiate", "_contract_address");
 
@@ -57,6 +58,25 @@ pub trait IndexResponse {
             .map(|s| s.parse().unwrap())
         {
             Ok(code_id)
+        } else {
+            // for injective
+            #[cfg(not(feature = "eth"))]
+            panic!("Injective upload event parsing not supported without eth feature");
+            #[cfg(feature = "eth")]
+            self.event_attr_value(
+                INJECTIVE_CODE_ID_UPLOAD_EVENT.0,
+                INJECTIVE_CODE_ID_UPLOAD_EVENT.1,
+            )
+            .map(|s| unescape(&s).unwrap().parse().unwrap())
+        }
+    }
+    /// Shortcut to get the code id of a contract of an upload response.
+    fn uploaded_zk_id(&self) -> StdResult<u64> {
+        if let Ok(zk_id) = self
+            .event_attr_value(ZK_ID_UPLOAD_EVENT.0, ZK_ID_UPLOAD_EVENT.1)
+            .map(|s| s.parse().unwrap())
+        {
+            Ok(zk_id)
         } else {
             // for injective
             #[cfg(not(feature = "eth"))]

@@ -201,6 +201,7 @@ fn does_not_error_when_using_different_files() {
 
 #[test]
 #[serial_test::serial]
+#[ignore = "Requires live NEUTRON_1 gRPC endpoint"]
 fn reuse_same_state_multichain() {
     let daemon = DaemonBuilder::new(JUNO_1)
         .mnemonic(DUMMY_MNEMONIC)

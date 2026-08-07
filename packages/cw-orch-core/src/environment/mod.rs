@@ -17,3 +17,9 @@ pub use queriers::{
 };
 pub use state::{ChainState, StateInterface};
 pub use tx_handler::{AccessConfig, TxHandler, TxResponse};
+
+#[cfg(feature = "zk")]
+pub use {
+    envs::{MutZkCwEnv, ZkCwEnv},
+    tx_handler::ZkTxHandler,
+};

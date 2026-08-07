@@ -3,6 +3,8 @@ mod tests {
         DaemonAsync contract general tests
     */
 
+    #[cfg(feature = "zk")]
+    use cw_orch_core::environment::ZkTxHandler;
     use cw_orch_core::{contract::interface_traits::*, environment::TxHandler};
     use cw_orch_mock::Mock;
     use mock_contract::{InstantiateMsg, MigrateMsg, QueryMsg};

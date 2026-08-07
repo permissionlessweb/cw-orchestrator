@@ -47,7 +47,13 @@ impl<A: Api> BankQuerier for MockBankQuerier<A> {
                 .amount;
             Ok(vec![Coin { amount, denom }])
         } else {
-            Err(CwEnvError::StdErr("you must provide a coin denomination to query a balance for. We currently cannot query for all of the uses balances, due to support of this function being removed in cosmwasm@v3.0.0".into()))
+            let address = address.clone();
+            Ok(self
+                .app
+                .borrow()
+                .read_module(|router, _, storage| {
+                    router.bank.get_all_balances(storage, &address)
+                })?)
         }
     }
 

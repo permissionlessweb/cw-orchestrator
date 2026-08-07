@@ -17,7 +17,7 @@ pub mod prelude {
     pub use cw_orch_interchain_daemon::{
         ChannelCreationValidator, ChannelCreator, DaemonInterchain,
     };
-    #[cfg(feature = "daemon")]
+    #[cfg(feature = "starship")]
     pub use cw_orch_starship::Starship;
 }
 
@@ -38,7 +38,7 @@ pub mod daemon {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[cfg(feature = "daemon")]
+#[cfg(feature = "starship")]
 pub mod starship {
     pub use cw_orch_starship::*;
 }

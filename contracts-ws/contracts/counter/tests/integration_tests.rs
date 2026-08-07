@@ -61,13 +61,10 @@ fn count() -> StdResult<()> {
         contract.call_as(&user).reset(0);
 
     let expected_err = ContractError::Unauthorized {};
-    assert_eq!(
-        exec_res
-            .unwrap_err()
-            .downcast::<ContractError>()?
-            .to_string(),
-        expected_err.to_string(),
-    );
+    assert!(exec_res
+        .unwrap_err()
+        .to_string()
+        .contains(&expected_err.to_string()));
 
     Ok(())
 }

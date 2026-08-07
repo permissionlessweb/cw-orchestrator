@@ -8,5 +8,5 @@ pub mod cw4_group;
 pub mod cw4_stake;
 
 pub const WASM_RELEASE_TAG: &str = "v1.1.2";
-pub const WASM_REPO_OWNER: &str = "cosmwasm";
-pub const WASM_REPO_NAME: &str = "cw-plus";
+pub const WASMOWNER: &str = "cosmwasm";
+pub const WASMNAME: &str = "cw-plus";

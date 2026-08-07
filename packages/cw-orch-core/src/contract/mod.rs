@@ -1,5 +1,6 @@
 mod contract_instance;
 mod deploy;
+mod ibc_wasm;
 pub mod interface_traits;
 mod paths;
 

@@ -41,7 +41,7 @@ mod interfaces {
             description: String,
             msgs: Vec<cosmwasm_std::CosmosMsg<Empty>>,
             // note: we ignore API-spec'd earliest if passed, always opens immediately
-            latest: Option<cw_utils::Expiration>,
+            latest: Option<cw20::Expiration>,
         },
         Vote {
             proposal_id: u64,

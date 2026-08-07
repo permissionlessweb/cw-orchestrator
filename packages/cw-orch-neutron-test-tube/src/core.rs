@@ -51,7 +51,7 @@ pub const MOCK_CHAIN_INFO: ChainInfo = ChainInfo {
 ///
 /// ## Example
 /// ```
-/// # use cosmwasm_std::{Addr, coins, Uint128};
+/// # use cosmwasm_std::{Addr, coins, Uint256};
 /// use cw_orch_neutron_test_tube::NeutronTestTube;
 /// use cw_orch_neutron_test_tube::neutron_test_tube::Account;
 ///
@@ -62,8 +62,8 @@ pub const MOCK_CHAIN_INFO: ChainInfo = ChainInfo {
 /// let account = tube.init_account(coins(1_000_000_000, "uatom")).unwrap();
 ///
 /// // query the balance
-/// let balance: Uint128 = tube.query_balance(&Addr::unchecked(account.address()), "uatom").unwrap();
-/// assert_eq!(balance.u128(), 1_000_000_000u128);
+/// let balance: Uint256 = tube.query_balance(&Addr::unchecked(account.address()), "uatom").unwrap();
+/// assert_eq!(balance, Uint256::new(1_000_000_000u128));
 /// ```
 #[derive(Clone)]
 pub struct NeutronTestTube<S: StateInterface = MockState> {

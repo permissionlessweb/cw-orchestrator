@@ -21,6 +21,7 @@ use cosmwasm_std::Empty;
 
 /// For those Who don't know, CAVERN PROTOCOL was a money market
 #[test]
+#[ignore = "requires gRPC connection to live chain"]
 pub fn cavern_integration_test() -> StdResult<()> {
     pretty_env_logger::init();
 
@@ -166,6 +167,7 @@ fn query_a_currency_balance(chain: &CloneTesting) -> StdResult<BalanceResponse> 
 }
 
 #[test]
+#[ignore = "requires gRPC connection to live chain"]
 fn query_hash() -> StdResult<()> {
     let app = CloneTesting::new(PHOENIX_1)?;
     let market = CavernMarket::new("cavern:money-market", app.clone());
@@ -178,6 +180,7 @@ fn query_hash() -> StdResult<()> {
 }
 
 #[test]
+#[ignore = "requires gRPC connection to live chain"]
 fn query_contract_info() -> StdResult<()> {
     let app = CloneTesting::new(PHOENIX_1)?;
     let market = CavernMarket::new("cavern:money-market", app.clone());

@@ -16,6 +16,11 @@ pub use crate::contract::interface_traits::{
     CwOrchInstantiate, CwOrchMigrate, CwOrchQuery, CwOrchUpload, ExecutableContract,
     InstantiableContract, MigratableContract, QueryableContract, Uploadable,
 };
+#[cfg(feature = "zk")]
+pub use crate::{
+    circuits::{circuit_interface_traits::CircuitUploadable, CircuitInstance, CwOrchCircuitUpload},
+    environment::{ZkCwEnv, ZkTxHandler},
+};
 
 pub use cw_orch_core::contract::Deploy;
 

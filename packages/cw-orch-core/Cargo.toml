@@ -17,14 +17,19 @@ exclude = [".env"]
 all-features = true
 
 [features]
-default = []
+default = ["zk"]
 eth     = ["dep:snailquote"]
+terp    = []
+zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm", "dep:halo2_proofs", "terp"]
 
 [dependencies]
 cosmwasm-std  = { workspace = true }
 cw-multi-test = { workspace = true }
 serde         = { workspace = true }
 thiserror     = { workspace = true }
+zk-cosmwasm = { workspace = true, optional = true }
+# Footer length / wire layout source of truth for circuit path helpers.
+halo2_proofs = { package = "halo2_proofs", path = "../../../zcash/halo2/halo2_proofs", default-features = false, optional = true }
 
 anyhow     = { workspace = true }
 log        = { workspace = true }

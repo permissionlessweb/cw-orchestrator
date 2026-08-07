@@ -24,8 +24,13 @@ impl GrpcChannel {
 
             let uri = Uri::from_maybe_shared(address.clone()).expect("Invalid URI");
 
-            let maybe_channel = Endpoint::from(uri)
-                .tls_config(ClientTlsConfig::new().with_enabled_roots())
+            let maybe_channel = Endpoint::from(uri.clone())
+                .tls_config(
+                    ClientTlsConfig::new()
+                        .with_enabled_roots()
+                        // grpcs are http/2 by spec
+                        .assume_http2(true),
+                )
                 .unwrap()
                 .connect()
                 .await;
@@ -53,6 +58,11 @@ impl GrpcChannel {
                     "Network mismatch: connection:{} != config:{}",
                     node_info.default_node_info.as_ref().unwrap().network,
                     chain_id
+                );
+                log::error!(
+                    "default:{:#?} != ::: uri: {:#?}",
+                    node_info.default_node_info,
+                    uri
                 );
                 continue;
             }

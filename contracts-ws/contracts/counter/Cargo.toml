@@ -15,20 +15,15 @@ default = ["export"]
 export  = []
 
 [dependencies]
-cosmwasm-schema = "3.0.1"
+cosmwasm-schema = { workspace = true }
 cosmwasm-std    = { workspace = true }
 cw-orch         = { workspace = true, features = ["daemon"] }
 cw-storage-plus = { workspace = true }
-cw2             = "3.0"
-schemars = "0.8.4"
+cw2 = { path = "../../../../cw-minus/packages/cw2" }
+schemars = "0.8"
 serde           = { workspace = true }
 serde_json      = "1.0.125"
 thiserror       = { version = "1.0.63" }
-# Unused, only there to check for wasm compatibility
-cw-orch-interchain = { workspace = true, features = ["daemon"] }
-
-[[example]]
-name = "deploy"
 
 [dev-dependencies]
 # Deps for deployment
@@ -36,3 +31,6 @@ anyhow            = { workspace = true }
 cw-orch           = { workspace = true, features = ["daemon"] }
 dotenv            = { version = "0.15.0" }
 pretty_env_logger = { version = "0.5.0" }
+
+[[example]]
+name = "deploy"

@@ -6,13 +6,19 @@ use crate::{
     senders::{builder::SenderBuilder, query::QuerySender, tx::TxSender},
     DaemonAsyncBuilder, DaemonState,
 };
+
 use cosmrs::{
     cosmwasm::{MsgExecuteContract, MsgInstantiateContract, MsgMigrateContract},
     proto::cosmwasm::wasm::v1::MsgInstantiateContract2,
-    tendermint::Time,
     AccountId, Any, Denom,
 };
 use cosmwasm_std::{Addr, Binary, Coin};
+
+#[cfg(feature = "zk")]
+use cw_orch_core::{
+    circuits::circuit_interface_traits::CircuitUploadable, circuits::CircuitPath,
+    environment::ZkTxHandler,
+};
 use cw_orch_core::{
     contract::{interface_traits::Uploadable, WasmPath},
     environment::{
@@ -221,6 +227,10 @@ impl<Sender> ChainState for DaemonAsyncBase<Sender> {
     fn state(&self) -> Self::Out {
         self.state.clone()
     }
+    // I TURNED THIS ON: @hard-nett
+    fn can_load_state_from_state_file(&self) -> bool {
+        true
+    }
 }
 
 // Execute on the real chain, returns tx response.
@@ -348,6 +358,38 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
     ) -> Result<CosmTxResponse, DaemonError> {
         self.upload_with_access_config(uploadable, None).await
     }
+    /// Upload a circuit to the chain.
+    #[cfg(feature = "zk")]
+    pub async fn upload_circuit<T: CircuitUploadable>(
+        &self,
+        uploadable: &T,
+    ) -> Result<CosmTxResponse, DaemonError> {
+        self.upload_circuit_with_access_config(uploadable, None)
+            .await
+    }
+
+    /// Upload a contract to the chain and specify the permissions for instantiating
+    #[cfg(feature = "zk")]
+    pub async fn upload_circuit_with_access_config<T: CircuitUploadable>(
+        &self,
+        _uploadable: &T,
+        access: Option<AccessConfig>,
+    ) -> Result<CosmTxResponse, DaemonError> {
+        let circuit_path = CircuitPath::new(
+            <T as CircuitUploadable>::vk_path(),
+            cw_orch_core::circuits::CircuitSpec::Halo2Plonk,
+        )?;
+        log::debug!(target: &transaction_target(), "Uploading file at {:?}", circuit_path);
+        let result = upload_circuit(self.sender(), circuit_path, access).await?;
+        log::info!(target: &transaction_target(), "Uploading done: {:?}", result.txhash);
+        let zk_id = result.uploaded_zk_id().unwrap();
+        // wait for the node to return the contract information for this upload
+        let wasm = CosmWasm::new_async(self.channel());
+        while wasm._circuit(zk_id).await.is_err() {
+            self.next_block().await?;
+        }
+        Ok(result)
+    }
 
     /// Upload a contract to the chain and specify the permissions for instantiating
     pub async fn upload_with_access_config<T: Uploadable>(
@@ -386,6 +428,28 @@ pub async fn upload_wasm<T: TxSender>(
     let store_msg = cosmrs::cosmwasm::MsgStoreCode {
         sender: sender.msg_sender().map_err(Into::into)?,
         wasm_byte_code,
+        instantiate_permission: access.map(access_config_to_cosmrs).transpose()?,
+    };
+
+    sender
+        .commit_tx(vec![store_msg], None)
+        .await
+        .map_err(Into::into)
+}
+
+#[cfg(feature = "zk")]
+pub async fn upload_circuit<T: TxSender>(
+    sender: &T,
+    wasm_path: CircuitPath,
+    access: Option<AccessConfig>,
+) -> Result<CosmTxResponse, DaemonError> {
+    let file_contents = std::fs::read(wasm_path.path())?;
+    let mut e = write::GzEncoder::new(Vec::new(), Compression::default());
+    e.write_all(&file_contents)?;
+
+    let store_msg = cosmrs::cosmwasm::MsgStoreCircuit {
+        sender: sender.msg_sender().map_err(Into::into)?,
+        circuit_binary: file_contents,
         instantiate_permission: access.map(access_config_to_cosmrs).transpose()?,
     };
 

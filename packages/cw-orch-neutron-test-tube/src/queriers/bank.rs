@@ -2,8 +2,7 @@ use crate::{map_err, NeutronTestTube};
 
 use std::{cell::RefCell, rc::Rc};
 
-use cosmos_sdk_proto::cosmos::base::query::v1beta1::PageRequest;
-use cosmwasm_std::{coin, Addr, Uint256};
+use cosmwasm_std::{coin, Addr};
 use cw_orch_core::environment::{BankQuerier, Querier, QuerierGetter, StateInterface};
 use cw_orch_core::CwEnvError;
 use neutron_test_tube::{

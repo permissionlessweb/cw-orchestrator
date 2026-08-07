@@ -1,22 +1,24 @@
 [workspace]
 exclude = [
-  "test_contracts/compatibility-test", # TODO: add new after cw-orch-core 2.0.0 as it's breaking, it shouldn't be compatible
+    # TODO: add new after cw-orch-core 2.0.0 as it's breaking, it shouldn't be compatible
+    "contracts-ws",
+    "test_contracts/compatibility-test",
 ]
 members = [
-  "cw-orch",
-  "cw-orch-daemon",
-  "cw-orch-interchain",
-  "packages/cw-orch-core",
-  "packages/cw-orch-mock",
-  "packages/cw-orch-networks",
-  "packages/clone-testing",
-  "packages/cw-orch-osmosis-test-tube",
-  "packages/cw-orch-neutron-test-tube",
-  "packages/cw-orch-traits",
-  "test_contracts/*",
-  "packages/macros/*",
-  "packages/interchain/*",
-  "packages/integrations/*",
+    "cw-orch",
+    "cw-orch-daemon",
+    "cw-orch-interchain",
+    "packages/clone-testing",
+    "packages/cw-orch-core",
+    "packages/cw-orch-mock",
+    "packages/cw-orch-networks",
+    "packages/cw-orch-neutron-test-tube",
+    "packages/cw-orch-osmosis-test-tube",
+    "packages/cw-orch-traits",
+    "packages/integrations/*",
+    "packages/interchain/*",
+    "packages/macros/*",
+    "test_contracts/*",
 ]
 resolver = "2"
 
@@ -26,65 +28,109 @@ edition    = "2021"
 license    = "LGPL-3.0"
 repository = "https://github.com/AbstractSDK/cw-orchestrator"
 
+[workspace.features]
+default = []
+zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm"]
+
 [workspace.dependencies]
-cosmwasm-std     = { version = "3.0.1" }
-cw-storage-plus  = { version = "3.0.0" }
-cw-utils         = { version = "3.0.0" }
+cosmwasm-std = { path = "../cosmwasm/packages/std" }
+cw-storage-plus = { path = "../cw-storage-plus" }
 
-cw-multi-test = { package = "abstract-cw-multi-test", version = "3.0.0-rc", features = ["cosmwasm_3_0"], git = "https://github.com/permissionlessweb/cw-multi-test-fork", branch = "bump/cw3/official-ibc-fork" }
-
-cosmos-sdk-proto = { version = "0.28.0",git = "https://github.com/permissionlessweb/cosmos-rust", default-features = false}
-cw20             = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
-cw20-base        = { version = "3.0.0", git = "https://github.com/permissionlessweb/cw-plus" }
-
-neutron-test-tube = { package = "neutron-test-tube",version = "5.1.3", git = "https://github.com/permissionlessweb/neutron-test-tube" }
-osmosis-test-tube = { version = "25.0.0", git = "https://github.com/permissionlessweb/osmosis-test-tube" }
+clone-cw-multi-test = { package = "cw-multi-test", path = "../clone-cw-multi-test", features = ["cosmwasm_3_0"] }
+cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
+cosmrs = { path = "../cosmos-rust/cosmrs" }
+cw-multi-test = { package = "abstract-cw-multi-test", path = "../cw-multi-test-fork" }
+cw-utils = { path = "../cw-minus/packages/cw-utils" }
+cw20 = { path = "../cw-plus/packages/cw20" }
+cw20-base = { path = "../cw-plus/contracts/cw20-base" }
+ibc-proto = { path = "../ibc-proto-rs" }
+neutron-std = { path = "../neutron-std/packages/neutron-std" }
+neutron-test-tube = { path = "../neutron-test-tube/packages/neutron-test-tube" }
+osmosis-std = { path = "../osmosis-rust/packages/osmosis-std" }
+osmosis-test-tube = { path = "../osmosis-test-tube/packages/osmosis-test-tube" }
+simple-ica = { path = "../cw-ibc-demo/packages/simple-ica" }
+simple-ica-controller = { path = "../cw-ibc-demo/contracts/simple-ica-controller" }
+simple-ica-host = { path = "../cw-ibc-demo/contracts/simple-ica-host" }
+tendermint = { path = "../tendermint-rs/tendermint" }
+tendermint-proto = { path = "../tendermint-rs/proto" }
+tendermint-rpc = { path = "../tendermint-rs/rpc" }
+zk-cosmwasm = { path = "../cosmwasm/packages/zk" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
 tokio  = { version = "1.39", features = ["full"] }
 
-cw-orch          = { path = "./cw-orch", version = "0.30.0" }
-cw-orch-core     = { path = "packages/cw-orch-core", version = "2.1.4" }
-cw-orch-daemon   = { path = "./cw-orch-daemon", version = "0.29.0" }
-cw-orch-mock     = { path = "packages/cw-orch-mock", version = "0.24.2" }
-cw-orch-networks = { path = "packages/cw-orch-networks", version = "0.24.3" }
-cw-orch-traits   = { path = "packages/cw-orch-traits", version = "0.25.0" }
+cw-orch = { path = "cw-orch" }
+cw-orch-core = { path = "packages/cw-orch-core" }
+cw-orch-daemon = { path = "cw-orch-daemon" }
+cw-orch-mock = { path = "packages/cw-orch-mock" }
+cw-orch-networks = { path = "packages/cw-orch-networks" }
+cw-orch-traits = { path = "packages/cw-orch-traits" }
 
 # Macros
-cw-orch-contract-derive = { path = "packages/macros/cw-orch-contract-derive", version = "0.21.0" }
-cw-orch-fns-derive      = { path = "packages/macros/cw-orch-fns-derive", version = "0.23.0" }
+cw-orch-circuit-derive = { path = "packages/macros/cw-orch-circuit-derive" }
+cw-orch-contract-derive = { path = "packages/macros/cw-orch-contract-derive" }
+cw-orch-fns-derive = { path = "packages/macros/cw-orch-fns-derive" }
 
 # Extensions
-cw-orch-neutron-test-tube = {  version = "0.1.0", path = "packages/cw-orch-neutron-test-tube" }
-cw-orch-osmosis-test-tube = { version = "0.4.0", path = "packages/cw-orch-osmosis-test-tube" }
+cw-orch-neutron-test-tube = { path = "packages/cw-orch-neutron-test-tube" }
+cw-orch-osmosis-test-tube = { path = "packages/cw-orch-osmosis-test-tube" }
 
 #Clone Testing
-cw-orch-clone-testing = { version = "0.8.0", path = "packages/clone-testing" }
+cw-orch-clone-testing = { path = "packages/clone-testing" }
 
 # Interchain
-cw-orch-interchain        = { path = "cw-orch-interchain", version = "0.8.0" }
-cw-orch-interchain-core   = { path = "packages/interchain/interchain-core", version = "0.9.0" }
-cw-orch-interchain-daemon = { path = "packages/interchain/interchain-daemon", version = "0.9.0" }
-cw-orch-interchain-mock   = { path = "packages/interchain/interchain-mock", version = "0.9.0" }
-cw-orch-proto             = { path = "packages/interchain/proto", version = "0.9.0" }
-cw-orch-starship          = { path = "packages/interchain/starship", version = "0.7.0" }
+cw-orch-interchain = { path = "cw-orch-interchain" }
+cw-orch-interchain-core = { path = "packages/interchain/interchain-core" }
+cw-orch-interchain-daemon = { path = "packages/interchain/interchain-daemon" }
+cw-orch-interchain-mock = { path = "packages/interchain/interchain-mock" }
+cw-orch-proto = { path = "packages/interchain/proto" }
+cw-orch-starship = { path = "packages/interchain/starship" }
 
-
-cosmrs = { git = "https://github.com/permissionlessweb/cosmos-rust" }
-ibc-proto   = { version = "0.52.0" , git = "https://github.com/permissionlessweb/ibc-proto-rs" }
 prost       = "0.14.1"
 prost-types = "0.14.1"
 serde_json  = "1.0.125"
 sha2        = { version = "0.10.8" }
-thiserror   = { version = "1.0.63" }
-tonic       = { version = "0.14.1", features = ["codegen"] }
 # Test deps
 speculoos = "0.11.0"
+thiserror   = { version = "1.0.63" }
+tonic       = { version = "0.14.1", features = ["codegen"] }
 
 # Logging
 log = "0.4.22"
 
-# Interchain
-ibc-chain-registry = { version = "0.29.2" }
-ibc-relayer-types  = { version = "0.29.5" }
+# Interchain / Hermes relayer
+ibc-chain-registry = { path = "../hermes/crates/chain-registry" }
+ibc-relayer-types = { path = "../hermes/crates/relayer-types" }
+
+# Unify crates.io transitive deps with our git forks
+[patch.crates-io]
+# Resolve self-referencing git deps to local paths
+
+cosmwasm-std = { path = "../cosmwasm/packages/std" }
+cosmwasm-core = { path = "../cosmwasm/packages/core" }
+cosmwasm-crypto = { path = "../cosmwasm/packages/crypto" }
+cosmwasm-derive = { path = "../cosmwasm/packages/derive" }
+cosmwasm-schema = { path = "../cosmwasm/packages/schema" }
+cosmwasm-schema-derive = { path = "../cosmwasm/packages/schema-derive" }
+cw-schema = { path = "../cosmwasm/packages/cw-schema" }
+cw-schema-derive = { path = "../cosmwasm/packages/cw-schema-derive" }
+cw-storage-plus = { path = "../cw-storage-plus" }
+
+[patch.'https://github.com/permissionlessweb/cw-orchestrator']
+cw-orch = { path = "cw-orch" }
+cw-orch-clone-testing = { path = "packages/clone-testing" }
+cw-orch-core = { path = "packages/cw-orch-core" }
+cw-orch-daemon = { path = "cw-orch-daemon" }
+cw-orch-interchain = { path = "cw-orch-interchain" }
+cw-orch-interchain-core = { path = "packages/interchain/interchain-core" }
+cw-orch-interchain-daemon = { path = "packages/interchain/interchain-daemon" }
+cw-orch-interchain-mock = { path = "packages/interchain/interchain-mock" }
+cw-orch-mock = { path = "packages/cw-orch-mock" }
+cw-orch-networks = { path = "packages/cw-orch-networks" }
+cw-orch-neutron-test-tube = { path = "packages/cw-orch-neutron-test-tube" }
+cw-orch-osmosis-test-tube = { path = "packages/cw-orch-osmosis-test-tube" }
+cw-orch-proto = { path = "packages/interchain/proto" }
+cw-orch-starship = { path = "packages/interchain/starship" }
+cw-orch-traits = { path = "packages/cw-orch-traits" }
+cw-plus-orch = { path = "packages/integrations/cw-plus" }
