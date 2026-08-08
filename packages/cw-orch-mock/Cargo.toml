@@ -20,8 +20,8 @@ serde         = { workspace = true }
 sha2          = { workspace = true }
 
 [dev-dependencies]
-cw20 = { path = "../../../cw-plus/packages/cw20" }
-cw20-base = { path = "../../../cw-plus/contracts/cw20-base" }
+cw20 = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-plus", branch = "v3.1.0-zk.0", package = "cw20" }
+cw20-base = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-plus", branch = "v3.1.0-zk.0", package = "cw20-base" }
 speculoos = { workspace = true }
 
 anyhow        = { workspace = true }

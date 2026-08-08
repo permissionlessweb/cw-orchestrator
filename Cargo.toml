@@ -33,28 +33,28 @@ default = []
 zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm"]
 
 [workspace.dependencies]
-cosmwasm-std = { path = "../cosmwasm/packages/std" }
-cw-storage-plus = { path = "../cw-storage-plus" }
+cosmwasm-std = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cosmwasm", branch = "v3.1.0-zk.0", package = "cosmwasm-std" }
+cw-storage-plus = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-storage-plus", branch = "v3.1.0-zk.0" }
 
-clone-cw-multi-test = { package = "cw-multi-test", path = "../clone-cw-multi-test", features = ["cosmwasm_3_0"] }
-cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
-cosmrs = { path = "../cosmos-rust/cosmrs" }
-cw-multi-test = { package = "abstract-cw-multi-test", path = "../cw-multi-test-fork" }
-cw-utils = { path = "../cw-minus/packages/cw-utils" }
-cw20 = { path = "../cw-plus/packages/cw20" }
-cw20-base = { path = "../cw-plus/contracts/cw20-base" }
-ibc-proto = { path = "../ibc-proto-rs" }
-neutron-std = { path = "../neutron-std/packages/neutron-std" }
-neutron-test-tube = { path = "../neutron-test-tube/packages/neutron-test-tube" }
-osmosis-std = { path = "../osmosis-rust/packages/osmosis-std" }
-osmosis-test-tube = { path = "../osmosis-test-tube/packages/osmosis-test-tube" }
-simple-ica = { path = "../cw-ibc-demo/packages/simple-ica" }
-simple-ica-controller = { path = "../cw-ibc-demo/contracts/simple-ica-controller" }
-simple-ica-host = { path = "../cw-ibc-demo/contracts/simple-ica-host" }
-tendermint = { path = "../tendermint-rs/tendermint" }
-tendermint-proto = { path = "../tendermint-rs/proto" }
-tendermint-rpc = { path = "../tendermint-rs/rpc" }
-zk-cosmwasm = { path = "../cosmwasm/packages/zk" }
+clone-cw-multi-test = { package = "cw-multi-test", git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/clone-cw-multi-test", branch = "cw3/adapt_for_local_execution", features = ["cosmwasm_3_0"] }
+cosmos-sdk-proto = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cosmos-rust", branch = "v3.1.0-zk.0", package = "cosmos-sdk-proto" }
+cosmrs = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cosmos-rust", branch = "v3.1.0-zk.0", package = "cosmrs" }
+cw-multi-test = { package = "abstract-cw-multi-test", git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-multi-test-fork", branch = "zk-mvp" }
+cw-utils = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-minus", branch = "main", package = "cw-utils" }
+cw20 = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-plus", branch = "v3.1.0-zk.0", package = "cw20" }
+cw20-base = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-plus", branch = "v3.1.0-zk.0", package = "cw20-base" }
+ibc-proto = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/ibc-proto-rs", branch = "v3.1.0-zk.0" }
+neutron-std = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/neutron-std", branch = "v3.1.0-zk.0", package = "neutron-std" }
+neutron-test-tube = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/neutron-test-tube", branch = "dev", package = "neutron-test-tube" }
+osmosis-std = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/osmosis-rust", branch = "cw3", package = "osmosis-std" }
+osmosis-test-tube = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/osmosis-test-tube", branch = "cw3", package = "osmosis-test-tube" }
+simple-ica = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-ibc-demo", branch = "cosmwasm3", package = "simple-ica" }
+simple-ica-controller = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-ibc-demo", branch = "cosmwasm3", package = "simple-ica-controller" }
+simple-ica-host = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-ibc-demo", branch = "cosmwasm3", package = "simple-ica-host" }
+tendermint = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/tendermint-rs", branch = "v3.1.0-zk.0", package = "tendermint" }
+tendermint-proto = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/tendermint-rs", branch = "v3.1.0-zk.0", package = "tendermint-proto" }
+tendermint-rpc = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/tendermint-rs", branch = "v3.1.0-zk.0", package = "tendermint-rpc" }
+zk-cosmwasm = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cosmwasm", branch = "v3.1.0-zk.0", package = "zk-cosmwasm" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }
@@ -100,8 +100,8 @@ tonic       = { version = "0.14.1", features = ["codegen"] }
 log = "0.4.22"
 
 # Interchain / Hermes relayer
-ibc-chain-registry = { path = "../hermes/crates/chain-registry" }
-ibc-relayer-types = { path = "../hermes/crates/relayer-types" }
+ibc-chain-registry = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/hermes", branch = "feat/feature-gate", package = "ibc-chain-registry" }
+ibc-relayer-types = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/hermes", branch = "feat/feature-gate", package = "ibc-relayer-types" }
 
 # Unify crates.io transitive deps with our git forks
 [patch.crates-io]

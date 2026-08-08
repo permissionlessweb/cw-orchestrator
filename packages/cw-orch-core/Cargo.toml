@@ -29,7 +29,7 @@ serde         = { workspace = true }
 thiserror     = { workspace = true }
 zk-cosmwasm = { workspace = true, optional = true }
 # Footer length / wire layout source of truth for circuit path helpers.
-halo2_proofs = { package = "halo2_proofs", path = "../../../zcash/halo2/halo2_proofs", default-features = false, optional = true }
+halo2_proofs = { package = "halo2_proofs", git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/zcash/halo2", branch = "mvp", default-features = false, optional = true }
 
 anyhow     = { workspace = true }
 log        = { workspace = true }
