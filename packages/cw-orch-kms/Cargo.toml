@@ -1,0 +1,33 @@
+[package]
+name = "cw-orch-kms"
+description = "cw-orch sender that authorizes a terp-frost Schnorr quorum"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-3.0"
+
+[features]
+default = []
+ict = ["dep:ict-rs", "dep:ict-rs-cw-orch"]
+
+[dependencies]
+cosmrs = { workspace = true, features = ["cosmwasm", "grpc"] }
+cosmwasm-std = { workspace = true }
+cw-orch-core = { workspace = true }
+cw-orch-daemon = { workspace = true }
+tonic = { workspace = true }
+osst = { path = "../../../zeratul/crates/osst", default-features = false, features = ["secp256k1"] }
+prost = { workspace = true }
+rand = "0.8"
+tokio = { workspace = true }
+# Pins keep cosmrs/reqwest on the lockfile's wasm-bindgen set. Newer
+# web-sys 0.3.105 and wasm-bindgen-futures 0.4.76 disagree on js-sys.
+js-sys = "=0.3.95"
+web-sys = "=0.3.95"
+wasm-bindgen-futures = "=0.4.68"
+ict-rs = { path = "../../../ict-rs/ict-rs", optional = true, default-features = false, features = ["docker", "terp", "testing"] }
+ict-rs-cw-orch = { path = "../../../ict-rs/ict-rs-cw-orch", optional = true, default-features = false }
+
+[dev-dependencies]
+anyhow = "1"
+serde_json = "1"
+tokio = { workspace = true }

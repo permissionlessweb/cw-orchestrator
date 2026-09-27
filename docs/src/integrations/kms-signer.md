@@ -284,6 +284,16 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
   passed 13 tests: 1-of-1 and 2-of-3 authorize, one share of a 2-of-3 does
   not, a pending rotate keeps the old key, an applied rotate switches the
   key, sudo does not write, and opaque rotate labels still rotate.
-  Threshold ECDSA is still not started. The cw-orch sender that submits
-  these signatures is not started. The `terp-rs` index already contained
+  Threshold ECDSA is still not started. The `terp-rs` index already contained
   unrelated staged work, so this contract change was not committed.
+- 2026-09-27. `packages/cw-orch-kms` is the cw-orch sender. `FrostKmsSender`
+  puts the 65-byte Schnorr signature on a `SIGN_MODE_DIRECT` sign doc and
+  selects the authenticator with `TxExtension`. `cargo test -p cw-orch-kms --lib`
+  passed the quorum tests. The ict-rs suite
+  `packages/cw-orch-kms/tests/local_chain.rs` spawned a local node and
+  cw-orch reached it. Upload failed: the wasm imports `env.blake3_256`
+  (`cosmwasm-std` default `zk` → `hash-blake`) and neither `v6.3.0-dev` nor
+  `v6.3.0-dev-blake3` provides that host import. A teammate is rebuilding
+  the image. The contract is not rebuilt without that import. The workspace
+  `Cargo.toml` member line sits in a file that already rewrites git deps to
+  local paths, so that file was not committed.
