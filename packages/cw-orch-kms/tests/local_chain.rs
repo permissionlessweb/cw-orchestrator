@@ -15,13 +15,15 @@
 #![cfg(feature = "ict")]
 
 use std::path::PathBuf;
-use cosmrs::cosmwasm::MsgInstantiateContract;
-use cw_orch_core::contract::WasmPath;
-use cw_orch_core::environment::IndexResponse;
+
+use cosmrs::cosmwasm::{MsgInstantiateContract, MsgStoreCode};
+use cosmrs::tx::Msg;
+use cosmrs::Any;
+use cw_orch_daemon::queriers::Node;
 use cw_orch_daemon::senders::builder::SenderBuilder;
 use cw_orch_daemon::senders::tx::TxSender;
-use cw_orch_daemon::{upload_wasm, DaemonAsyncBuilder};
-use cw_orch_kms::{add_authenticator_any, FrostKmsOptions, FrostSession};
+use cw_orch_daemon::{DaemonAsyncBuilder, TxBuilder};
+use cw_orch_kms::{FrostKmsOptions, FrostSession};
 use ict_rs::prelude::*;
 use ict_rs::testing::env::TestEnv;
 use ict_rs_cw_orch::chain_info_from_cosmos;
@@ -124,11 +126,31 @@ async fn run_on(chain: &CosmosChain, wasm: &std::path::Path) -> Result<(), Strin
         .build()
         .await
         .map_err(|e| e.to_string())?;
-    let stored = upload_wasm(daemon.sender(), WasmPath::new(wasm).map_err(|e| e.to_string())?, None)
-        .await
-        .map_err(|e| format!("upload {e}"))?;
-    let code_id = stored.uploaded_code_id().map_err(|e| e.to_string())?;
     let session = FrostSession::deal(1, 1).map_err(|e| e)?;
+    let wasm_bytes = std::fs::read(wasm).map_err(|e| format!("read wasm {e}"))?;
+    let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    std::io::Write::write_all(&mut gzip, &wasm_bytes).map_err(|e| format!("gzip wasm {e}"))?;
+    let wasm_byte_code = gzip.finish().map_err(|e| format!("gzip finish {e}"))?;
+    let store = MsgStoreCode {
+        sender: daemon.sender().msg_sender().map_err(|e| e.to_string())?,
+        wasm_byte_code,
+        instantiate_permission: None,
+    };
+    broadcast_msgs(daemon.sender(), vec![store.into_any().map_err(|e| e.to_string())?], "store terp-frost")
+        .await?;
+    wait_for_blocks(chain, 2).await.map_err(|e| e.to_string())?;
+    let listed = chain
+        .chain_exec(&["query", "wasm", "list-code", "--output", "json"])
+        .await
+        .map_err(|e| e.to_string())?;
+    let codes: serde_json::Value = serde_json::from_str(listed.stdout_str().trim())
+        .map_err(|e| format!("list-code {e}: {}", listed.stdout_str()))?;
+    let code_id = codes["code_infos"]
+        .as_array()
+        .and_then(|rows| rows.last())
+        .and_then(|row| row.get("code_id"))
+        .and_then(|id| id.as_str().map(|s| s.to_string()).or_else(|| id.as_u64().map(|n| n.to_string())))
+        .ok_or_else(|| format!("no code id in {}", listed.stdout_str()))?;
     let init = serde_json::json!({
         "group_vk": session.group_vk(),
         "t": 1,
@@ -138,30 +160,40 @@ async fn run_on(chain: &CosmosChain, wasm: &std::path::Path) -> Result<(), Strin
     let instantiate = MsgInstantiateContract {
         sender: daemon.sender().msg_sender().map_err(|e| e.to_string())?,
         admin: None,
-        code_id,
+        code_id: code_id.parse::<u64>().map_err(|e| e.to_string())?,
         label: Some("terp-frost-kms".into()),
         msg: serde_json::to_vec(&init).map_err(|e| e.to_string())?,
         funds: vec![],
     };
-    let instantiated = daemon
-        .sender()
-        .commit_tx(vec![instantiate], Some("instantiate terp-frost"))
+    broadcast_msgs(
+        daemon.sender(),
+        vec![instantiate.into_any().map_err(|e| e.to_string())?],
+        "instantiate terp-frost",
+    )
+    .await?;
+    wait_for_blocks(chain, 2).await.map_err(|e| e.to_string())?;
+    let contracts = chain
+        .chain_exec(&[
+            "query",
+            "wasm",
+            "list-contract-by-code",
+            &code_id,
+            "--output",
+            "json",
+        ])
         .await
-        .map_err(|e| format!("instantiate {e}"))?;
-    let contract = instantiated
-        .instantiated_contract_address()
         .map_err(|e| e.to_string())?;
-    daemon
-        .sender()
-        .commit_tx_any(
-            vec![add_authenticator_any(
-                daemon.sender().address().as_str(),
-                contract.as_str(),
-            )],
-            Some("add frost authenticator"),
-        )
-        .await
-        .map_err(|e| format!("add authenticator {e}"))?;
+    let listed_contracts: serde_json::Value = serde_json::from_str(contracts.stdout_str().trim())
+        .map_err(|e| format!("list-contract {e}: {}", contracts.stdout_str()))?;
+    let contract = listed_contracts["contracts"]
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| format!("no contract in {}", contracts.stdout_str()))?
+        .to_string();
+    let add = cw_orch_kms::add_authenticator_any(daemon.sender().address().as_str(), &contract);
+    broadcast_msgs(daemon.sender(), vec![add], "add frost authenticator").await?;
+    wait_for_blocks(chain, 2).await.map_err(|e| e.to_string())?;
     wait_for_blocks(chain, 1).await.map_err(|e| e.to_string())?;
     let listed = chain
         .chain_exec(&[
@@ -223,3 +255,26 @@ async fn run_on(chain: &CosmosChain, wasm: &std::path::Path) -> Result<(), Strin
     }
     Ok(())
 }
+
+async fn broadcast_msgs(
+    wallet: &cw_orch_daemon::Wallet,
+    msgs: Vec<Any>,
+    memo: &str,
+) -> Result<String, String> {
+    let node = Node::new_async(wallet.channel());
+    let height = node._block_height().await.map_err(|e| e.to_string())? + 20;
+    let body = TxBuilder::build_body(msgs, Some(memo), height);
+    let raw = TxBuilder::new(body)
+        .build(wallet)
+        .await
+        .map_err(|e| format!("{memo} build {e}"))?;
+    let ack = TxSender::broadcast_tx(wallet, raw)
+        .await
+        .map_err(|e| format!("{memo} broadcast {e}"))?;
+    if ack.code != 0 {
+        return Err(format!("{memo} code {} {}", ack.code, ack.raw_log));
+    }
+    Ok(ack.txhash)
+}
+
+

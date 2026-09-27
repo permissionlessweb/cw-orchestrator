@@ -302,5 +302,10 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
   `MsgAddAuthenticator` panics in that binary:
   `PermissionedKeeper.Sudo` on a nil pointer. `app/keepers/keepers.go`
   registered the CosmWasm authenticator before `ContractKeeper` was assigned.
-  That registration is now after the assignment. This image does not contain
-  that fix, so the bank-send leg did not run.
+  That registration is now after the assignment.
+- 2026-09-27. Re-ran on the rebuilt arm64 image `registry.terp.network/terp-core:v6.3.0`
+  from `05054d9`. `ICT_FROST=1 cargo test -p cw-orch-kms --features ict --test local_chain`
+  passed in 23.6s. The chain stored `terp-frost`, instantiated it, added the
+  CosmWasm authenticator, and `FrostKmsSender` broadcast a bank send whose
+  signature is the Schnorr quorum. The contract's group verifying key matched
+  the session. The amd64 tar was not loaded.

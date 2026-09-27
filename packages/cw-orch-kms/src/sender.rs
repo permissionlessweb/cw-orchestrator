@@ -4,8 +4,7 @@
 use std::sync::Arc;
 
 use cosmrs::proto::cosmos::auth::v1beta1::{BaseAccount, QueryAccountRequest};
-use cosmrs::proto::cosmos::tx::v1beta1::service_client::ServiceClient;
-use cosmrs::proto::cosmos::tx::v1beta1::{BroadcastMode, BroadcastTxRequest};
+use cosmrs::proto::cosmos::tx::v1beta1::{BroadcastMode, BroadcastTxRequest, GetTxRequest};
 use cosmrs::proto::traits::Message;
 use cosmrs::tendermint::chain::Id;
 use cosmrs::proto::cosmos::tx::v1beta1::TxRaw;
@@ -189,12 +188,14 @@ impl TxSender for FrostKmsSender {
             0,
             Vec::new(),
         )?;
-        let gas_used = node._simulate_tx(simulated.to_bytes()?).await.map_err(|err| {
-            DaemonError::StdErr(format!(
-                "frost kms simulate failed for {} authenticator {}: {err}",
-                self.account_id, self.authenticator_id
-            ))
-        })?;
+        let gas_used = simulate_gas_used(self.channel(), simulated.to_bytes()?)
+            .await
+            .map_err(|err| {
+                DaemonError::StdErr(format!(
+                    "frost kms simulate failed for {} authenticator {}: {err}",
+                    self.account_id, self.authenticator_id
+                ))
+            })?;
         let gas_limit = ((gas_used as f64) * SUBMISSION_GAS_BUFFER).ceil() as u64;
         let fee_amount = ((gas_limit as f64) * self.chain_info.gas_price).ceil() as u128;
         let (_, sign_doc_bytes) = self.raw_tx(
@@ -217,23 +218,13 @@ impl TxSender for FrostKmsSender {
             fee_amount,
             signature.to_vec(),
         )?;
-        let mut client = ServiceClient::new(self.channel());
-        let broadcast = client
-            .broadcast_tx(BroadcastTxRequest {
-                tx_bytes: raw.to_bytes()?,
-                mode: BroadcastMode::Sync.into(),
-            })
+        let broadcast = broadcast_lite(self.channel(), raw.to_bytes()?)
             .await
             .map_err(|err| {
                 DaemonError::StdErr(format!(
                     "frost kms broadcast failed for {}: {err}",
                     self.account_id
                 ))
-            })?
-            .into_inner()
-            .tx_response
-            .ok_or_else(|| {
-                DaemonError::StdErr("frost kms broadcast returned no tx response".into())
             })?;
         if broadcast.code != 0 {
             return Err(DaemonError::TxFailed {
@@ -244,17 +235,33 @@ impl TxSender for FrostKmsSender {
                 ),
             });
         }
-        let found = node._find_tx(broadcast.txhash).await?;
+        let found = find_tx_lite(self.channel(), &broadcast.txhash)
+            .await
+            .map_err(|err| {
+                DaemonError::StdErr(format!(
+                    "frost kms tx {} for {} not found: {err}",
+                    broadcast.txhash, self.account_id
+                ))
+            })?;
         if found.code != 0 {
             return Err(DaemonError::TxFailed {
-                code: found.code,
+                code: found.code as usize,
                 reason: format!(
                     "frost kms tx code {} for {}: {}",
                     found.code, self.account_id, found.raw_log
                 ),
             });
         }
-        Ok(found)
+        Ok(CosmTxResponse {
+            height: found.height as u64,
+            txhash: found.txhash,
+            codespace: found.codespace,
+            code: found.code as usize,
+            data: found.data,
+            raw_log: found.raw_log,
+            timestamp: chrono::Utc::now(),
+            ..CosmTxResponse::default()
+        })
     }
 
     async fn bank_send(
@@ -270,4 +277,138 @@ impl TxSender for FrostKmsSender {
         };
         self.commit_tx(vec![msg], Some("frost kms bank send")).await
     }
+}
+
+/// `SimulateResponse.result` carries event attributes. This chain emits
+/// attribute values that are not UTF-8, and the generated decoder rejects the
+/// whole response. Gas is field 1 and does not depend on those events.
+#[derive(Clone, PartialEq, prost::Message)]
+struct SimulateGasOnly {
+    #[prost(message, optional, tag = "1")]
+    gas_info: Option<cosmrs::proto::cosmos::base::abci::v1beta1::GasInfo>,
+    #[prost(bytes = "vec", tag = "2")]
+    _result: Vec<u8>,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct TxResponseLite {
+    #[prost(int64, tag = "1")]
+    height: i64,
+    #[prost(string, tag = "2")]
+    txhash: String,
+    #[prost(string, tag = "3")]
+    codespace: String,
+    #[prost(uint32, tag = "4")]
+    code: u32,
+    #[prost(string, tag = "5")]
+    data: String,
+    #[prost(string, tag = "6")]
+    raw_log: String,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct BroadcastLite {
+    #[prost(message, optional, tag = "1")]
+    tx_response: Option<TxResponseLite>,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct GetTxLite {
+    #[prost(bytes = "vec", tag = "1")]
+    _tx: Vec<u8>,
+    #[prost(message, optional, tag = "2")]
+    tx_response: Option<TxResponseLite>,
+}
+
+async fn broadcast_lite(channel: Channel, tx_bytes: Vec<u8>) -> Result<TxResponseLite, String> {
+    use tonic::client::Grpc;
+    use tonic::Request;
+    use tonic_prost::ProstCodec;
+
+    let mut grpc = Grpc::new(channel);
+    grpc.ready()
+        .await
+        .map_err(|err| format!("broadcast channel not ready: {err}"))?;
+    let path = http::uri::PathAndQuery::from_static("/cosmos.tx.v1beta1.Service/BroadcastTx");
+    let response = grpc
+        .unary(
+            Request::new(BroadcastTxRequest {
+                tx_bytes,
+                mode: BroadcastMode::Sync.into(),
+            }),
+            path,
+            ProstCodec::<BroadcastTxRequest, BroadcastLite>::default(),
+        )
+        .await
+        .map_err(|err| format!("broadcast rpc status {err}"))?;
+    response
+        .into_inner()
+        .tx_response
+        .ok_or_else(|| "broadcast returned no tx response".to_string())
+}
+
+async fn find_tx_lite(channel: Channel, hash: &str) -> Result<TxResponseLite, String> {
+    use tonic::client::Grpc;
+    use tonic::Request;
+    use tonic_prost::ProstCodec;
+
+    let path = http::uri::PathAndQuery::from_static("/cosmos.tx.v1beta1.Service/GetTx");
+    let mut wait = std::time::Duration::from_secs(1);
+    let mut last = String::from("not queried");
+    for _ in 0..12 {
+        let mut grpc = Grpc::new(channel.clone());
+        grpc.ready()
+            .await
+            .map_err(|err| format!("get_tx channel not ready: {err}"))?;
+        match grpc
+            .unary(
+                Request::new(GetTxRequest {
+                    hash: hash.to_string(),
+                }),
+                path.clone(),
+                ProstCodec::<GetTxRequest, GetTxLite>::default(),
+            )
+            .await
+        {
+            Ok(response) => {
+                if let Some(tx) = response.into_inner().tx_response {
+                    return Ok(tx);
+                }
+                last = "get_tx response had no tx_response".into();
+            }
+            Err(err) => last = err.to_string(),
+        }
+        tokio::time::sleep(wait).await;
+        wait = (wait * 2).min(std::time::Duration::from_secs(4));
+    }
+    Err(format!("tx {hash} after 12 tries: {last}"))
+}
+
+async fn simulate_gas_used(channel: Channel, tx_bytes: Vec<u8>) -> Result<u64, String> {
+    use cosmrs::proto::cosmos::tx::v1beta1::SimulateRequest;
+    use tonic::client::Grpc;
+    use tonic::Request;
+    use tonic_prost::ProstCodec;
+
+    let mut grpc = Grpc::new(channel);
+    grpc.ready()
+        .await
+        .map_err(|err| format!("simulate channel not ready: {err}"))?;
+    let path = http::uri::PathAndQuery::from_static("/cosmos.tx.v1beta1.Service/Simulate");
+    let response = grpc
+        .unary(
+            Request::new(SimulateRequest {
+                tx: None,
+                tx_bytes,
+            }),
+            path,
+            ProstCodec::<SimulateRequest, SimulateGasOnly>::default(),
+        )
+        .await
+        .map_err(|err| format!("simulate rpc status {err}"))?;
+    let gas = response
+        .into_inner()
+        .gas_info
+        .ok_or_else(|| "simulate response has no gas_info".to_string())?;
+    Ok(gas.gas_used)
 }
