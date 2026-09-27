@@ -1,9 +1,10 @@
 # Threshold KMS signer
 
-Status: v3, 2026-09-27. This page is the engineering spec and the working-state
+Status: v4, 2026-09-27. This page is the engineering spec and the working-state
 log for the cw-orch threshold KMS signer. Decisions live here, not in chat.
 
-Implementation is stopped before any crate code. See [Blocker](#blocker).
+Two signature tracks. Threshold ECDSA is the priority. FROST is a separate
+smart-account track. See [Account model](#account-model). No crate code yet.
 
 ## Decisions
 
@@ -72,9 +73,43 @@ Locked from D4, written down so they are not defaults discovered in code:
   torn, truncated, garbage, wrong-version, and wrong-length input by name.
   They do not repair it.
 
+## Account model
+
+Decided 2026-09-27 after the Schnorr/ECDSA contradiction. Two tracks. They
+are not adapters of each other.
+
+**Priority: threshold ECDSA, sharded keys.** A standard secp256k1 account
+whose address is the group public key. Quorum signing produces a recoverable
+ECDSA signature that `SIGN_MODE_DIRECT` accepts, without assembling the
+secret in one process. osst FROST does not do this. A search of `terp-rs`
+`*.rs` and `*.toml` for `cggmp`, `gg18`, `gg20`, and `threshold.ecdsa` on
+2026-09-27 returned no hits. No protocol crate is approved yet. The signing
+rounds are not implemented, and they will not be hand-rolled. The next step
+is a named, audited crate and version from the user. §2.4 still applies:
+adding that dependency requires that name.
+
+**FROST track: smart-account authenticator.** An account that signs with
+osst FROST is not a native secp256k1 account. It is a Terp smart account
+whose CosmWasm authenticator implements `TerpAccountTrait` and handles
+`AuthSudoMsg::Authenticate` (`crates/terp-auth/src/types.rs`). The
+authenticator stores the osst group verifying key and accepts a signature
+only when `osst::frost::verify_signature` accepts it over the bytes that
+authenticator defines (the sign-doc bytes in `AuthenticationRequest`, unless
+a later revision names a different preimage). The cw-orch sender for this
+track submits the Schnorr signature as authenticator signature data. It does
+not claim `SignDoc::sign` byte equality.
+
+`contracts/smart-accounts/terp-frost` is not that authenticator. It stores a
+group verifying key and rotates it. Its module docs say there is no `sudo` /
+Authenticate entry, because `CosmwasmAuthenticatorV1` discards writes. A
+FROST signature authenticator is a different contract and does not exist yet.
+This page does not create it.
+
 ## Blocker
 
-Verified 2026-09-27 in `crates/zeratul/crates/osst/src/frost.rs`.
+Verified 2026-09-27 in `crates/zeratul/crates/osst/src/frost.rs`. The
+arithmetic fact stands. The user decision above replaces "stop the project"
+with the two-track model. Threshold ECDSA stays blocked on a named crate.
 
 `aggregate` (line 489) sums FROST responses into `Signature { r, z }` and the
 comment calls it a standard Schnorr signature. `verify_signature` (line 554)
@@ -219,3 +254,8 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
 - 2026-09-27. Infisical sweep recorded. osst risk acceptance recorded.
 - 2026-09-27. Stopped. `osst::frost::aggregate` is Schnorr. No ECDSA adapter
   was written. No crate was added.
+- 2026-09-27. User decision: FROST accounts are smart accounts whose
+  authenticator authorizes osst signatures. Priority remains threshold ECDSA
+  for sharded secp256k1 keys. No threshold-ECDSA crate is in tree, so those
+  rounds are not started. `terp-frost` is a rotate contract, not the
+  authenticator.
