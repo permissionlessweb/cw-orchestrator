@@ -279,3 +279,11 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
   pubkey rotation stays on the existing execute messages. Authenticate is
   read-only against the applied group key. Wire format is 33-byte SEC1 `R`
   plus 32-byte `z`, because osst's 64-byte encoding drops y parity.
+- 2026-09-27. Implemented that contract in `terp-rs`
+  `contracts/smart-accounts/terp-frost`. `cargo test -p terp-frost --lib`
+  passed 13 tests: 1-of-1 and 2-of-3 authorize, one share of a 2-of-3 does
+  not, a pending rotate keeps the old key, an applied rotate switches the
+  key, sudo does not write, and opaque rotate labels still rotate.
+  Threshold ECDSA is still not started. The cw-orch sender that submits
+  these signatures is not started. The `terp-rs` index already contained
+  unrelated staged work, so this contract change was not committed.
