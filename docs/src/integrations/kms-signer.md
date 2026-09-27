@@ -1,10 +1,11 @@
 # Threshold KMS signer
 
-Status: v4, 2026-09-27. This page is the engineering spec and the working-state
+Status: v5, 2026-09-27. This page is the engineering spec and the working-state
 log for the cw-orch threshold KMS signer. Decisions live here, not in chat.
 
-Two signature tracks. Threshold ECDSA is the priority. FROST is a separate
-smart-account track. See [Account model](#account-model). No crate code yet.
+Two signature tracks. Threshold ECDSA is still blocked on a named crate.
+FROST authorization lives on `terp-frost` and must keep pubkey rotation
+working. See [Account model](#account-model).
 
 ## Decisions
 
@@ -88,22 +89,38 @@ rounds are not implemented, and they will not be hand-rolled. The next step
 is a named, audited crate and version from the user. §2.4 still applies:
 adding that dependency requires that name.
 
-**FROST track: smart-account authenticator.** An account that signs with
-osst FROST is not a native secp256k1 account. It is a Terp smart account
-whose CosmWasm authenticator implements `TerpAccountTrait` and handles
-`AuthSudoMsg::Authenticate` (`crates/terp-auth/src/types.rs`). The
-authenticator stores the osst group verifying key and accepts a signature
-only when `osst::frost::verify_signature` accepts it over the bytes that
-authenticator defines (the sign-doc bytes in `AuthenticationRequest`, unless
-a later revision names a different preimage). The cw-orch sender for this
-track submits the Schnorr signature as authenticator signature data. It does
-not claim `SignDoc::sign` byte equality.
+**FROST track: `terp-frost` is the authenticator.** Decided 2026-09-27.
+An account that signs with osst FROST is not a native secp256k1 account. It
+is a Terp smart account, and `contracts/smart-accounts/terp-frost` is the
+contract that both rotates the group verifying key and authorizes Schnorr
+signatures. Authorization and rotation do not share an entry point.
 
-`contracts/smart-accounts/terp-frost` is not that authenticator. It stores a
-group verifying key and rotates it. Its module docs say there is no `sudo` /
-Authenticate entry, because `CosmwasmAuthenticatorV1` discards writes. A
-FROST signature authenticator is a different contract and does not exist yet.
-This page does not create it.
+- Rotation stays `ExecuteMsg::RotateFrostPubkey` and `AddRotateShare`. Those
+  handlers still return Ok and write, including the fail reasons they already
+  write. A pending proposal does not change the key used for authorization.
+  The applied `group_vk` is the only key that authorizes. `old_vk` does not.
+- `sudo` handles `AuthSudoMsg`. `Authenticate` reads `group_vk` and the
+  signature. It does not write. `x/smart-account` discards writes made from
+  Authenticate, so putting rotation there would drop a rotate. Track,
+  confirm, add, and remove also do not write, and remove does not clear the
+  group key.
+- The signed preimage is `AuthenticationRequest.sign_mode_tx_data.sign_mode_direct`.
+  An empty preimage is rejected. `simulate: true` accepts without a signature
+  and still does not write, so gas estimation does not require a quorum.
+- `group_vk` for authorization is 66 lowercase hex characters of the 33-byte
+  SEC1 compressed osst secp256k1 point (`OsstPoint::compress_vec`). Any other
+  string, including the opaque labels the rotate tests use, fails
+  authorization with `group_vk is not a secp256k1 point` and leaves storage
+  as it was. Rotation of those labels is unchanged.
+- The signature is 65 bytes: 33-byte SEC1 `R` || 32-byte canonical scalar `z`.
+  osst `Signature::to_bytes` is 64 bytes and drops the secp256k1 y parity
+  (`compress` keeps x only; `decompress` assumes `0x02`). The contract does
+  not use that encoding. It decompresses the 33-byte `R` and calls
+  `osst::frost::verify_signature`. A failed check names the group key and the
+  preimage length. It does not echo the signature.
+
+Threshold ECDSA for a normal secp256k1 account is still not implemented. No
+protocol crate has been named.
 
 ## Blocker
 
@@ -257,5 +274,8 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
 - 2026-09-27. User decision: FROST accounts are smart accounts whose
   authenticator authorizes osst signatures. Priority remains threshold ECDSA
   for sharded secp256k1 keys. No threshold-ECDSA crate is in tree, so those
-  rounds are not started. `terp-frost` is a rotate contract, not the
-  authenticator.
+  rounds are not started. `terp-frost` was recorded here as rotate-only.
+- 2026-09-27. User decision: `terp-frost` is the Schnorr authenticator, and
+  pubkey rotation stays on the existing execute messages. Authenticate is
+  read-only against the applied group key. Wire format is 33-byte SEC1 `R`
+  plus 32-byte `z`, because osst's 64-byte encoding drops y parity.
