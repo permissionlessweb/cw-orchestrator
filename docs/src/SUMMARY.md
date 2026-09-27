@@ -23,6 +23,7 @@
 
 - [Integrations](./integrations/index.md)
   - [Daemon (Live Chains)](./integrations/daemon.md)
+  - [Threshold KMS signer](./integrations/kms-signer.md)
   - [Cw Multi Test](./integrations/cw-multi-test.md)
   - [Osmosis Test Tube](./integrations/osmosis-test-tube.md)
   - [Unit tests](./integrations/unit-tests.md)
