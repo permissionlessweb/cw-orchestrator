@@ -293,7 +293,14 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
   `packages/cw-orch-kms/tests/local_chain.rs` spawned a local node and
   cw-orch reached it. Upload failed: the wasm imports `env.blake3_256`
   (`cosmwasm-std` default `zk` → `hash-blake`) and neither `v6.3.0-dev` nor
-  `v6.3.0-dev-blake3` provides that host import. A teammate is rebuilding
-  the image. The contract is not rebuilt without that import. The workspace
-  `Cargo.toml` member line sits in a file that already rewrites git deps to
-  local paths, so that file was not committed.
+  `v6.3.0-dev-blake3` provides that host import. The contract is not rebuilt
+  without that import. The workspace `Cargo.toml` member line sits in a file
+  that already rewrites git deps to local paths, so that file was not committed.
+- 2026-09-27. Exercised `registry.terp.network/terp-core:v6.3.0` (arm64,
+  commit `4942c4f5`). `just wasm-dev` produced a wasmd-safe wasm. ict-rs
+  started the node, cw-orch stored the code and instantiated `terp-frost`.
+  `MsgAddAuthenticator` panics in that binary:
+  `PermissionedKeeper.Sudo` on a nil pointer. `app/keepers/keepers.go`
+  registered the CosmWasm authenticator before `ContractKeeper` was assigned.
+  That registration is now after the assignment. This image does not contain
+  that fix, so the bank-send leg did not run.
