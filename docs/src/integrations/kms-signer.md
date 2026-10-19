@@ -1,11 +1,19 @@
 # Threshold KMS signer
 
-Status: v5, 2026-09-27. This page is the engineering spec and the working-state
+Status: v6, 2026-10-18. This page is the engineering spec and the working-state
 log for the cw-orch threshold KMS signer. Decisions live here, not in chat.
 
 Two signature tracks. Threshold ECDSA is still blocked on a named crate.
 FROST authorization lives on `terp-frost` and must keep pubkey rotation
 working. See [Account model](#account-model).
+
+The product handoff for the remaining runtime work (one hash-market
+process for mainnet cw-orch, the local validator, Penumbra custody, and
+the re-zerve exercise) is
+`crates/terp-rs/reviews/KMS-PRODUCT-HANDOFF-2026-09-27.md`. This page
+stays the signer spec. That note stays the runtime plan. The scripting
+authorization model and its build order are
+[Scripting authorization](#scripting-authorization).
 
 ## Decisions
 
@@ -198,22 +206,28 @@ gas estimation.
 
 The signer has no local-key fallback. An unreachable KMS is a hard error.
 
-Two threshold key sets share one type parameterized by a validated
-`Threshold` (t-of-n). The treasury key uses a high quorum. The session key
-uses a lower quorum. `SessionGrant` owns, immutably, the grantee, the authz
-grant, the feegrant allowance, the `Expiration`, and the `SessionId`.
+The treasury key is the durable threshold key, parameterized by a validated
+`Threshold` (t-of-n). A script run does not create a second threshold key.
+It creates one ephemeral secp256k1 key inside the signer process. That key
+is the grantee of one authz grant and one feegrant. `SessionGrant` owns,
+immutably, the grantee, the authz grant, the feegrant allowance, the
+`Expiration`, the `SessionId`, the run allowlist, and the approval factor.
 Expiry is checked locally through an injected `Clock` and on chain. After
-expiry or revocation the session key cannot sign. Scope is enforced only in
-`authorize`. The audit trail is append-only: mint, register, use, expire,
-revoke, each with the `SignDocDigest`.
+expiry or revocation the ephemeral key cannot sign. Scope is enforced only
+in `authorize`. The audit trail is append-only: mint, register, use, expire,
+revoke, each with the `SignDocDigest`. See
+[Scripting authorization](#scripting-authorization) for the factors and the
+allowlist.
 
 The operator surface is one `Terminal` implementation with two carriers: a
 self-contained HTML file and a loopback WebSocket. The page renders the
-decoded sign doc and the SHA-256 of the exact bytes that would be signed.
-Approval requires an acknowledgement and a one-time nonce compared in
-constant time. Refusal emits no share, nonce, or partial signature. The
-listener binds `127.0.0.1` only, rejects traversal and NUL paths, and is
-dropped with the run. axum is the HTTP and WebSocket stack (D9).
+decoded messages and the SHA-256 of the sign-doc bytes. Keplr, Zafu, or a
+passkey approves that digest. The approval signature is not the chain
+signature. Approval requires a one-time nonce compared in constant time.
+Refusal emits no share, no nonce, no ephemeral key, and no partial
+signature. The listener binds `127.0.0.1` only, rejects traversal and NUL
+paths, and is dropped with the run. axum is the HTTP and WebSocket stack
+(D9).
 
 Shamir import is an offline migration binary with no network client and no
 sender constructor in scope. It preserves the bech32 address. The
@@ -246,17 +260,126 @@ equals `x` on generated valid inputs. Key material is redacted in `Debug`,
 Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
 `TxHandler` are not changed (D5).
 
+## Scripting authorization
+
+Decided 2026-10-18. A cw-orch script still ends in one `SenderBuilder`.
+These four choices are the scripting model. Threshold ECDSA stays blocked
+on a named crate and is not part of this workflow.
+
+- **S1. One stack, three factors.** The loopback page is the only operator
+  UI. Keplr, Zafu, or a passkey approves. The durable KMS holds the treasury
+  key. An ephemeral account broadcasts. There is no second daemon type and
+  no mode switch that drops one of the three factors out of the stack.
+- **S2. Digest approval.** The page shows the decoded messages and the
+  SHA-256 of the sign-doc. The factor signs an off-chain approval of that
+  digest plus a one-time nonce. The ephemeral key, inside the signer
+  process, produces the chain signature. The browser never receives a
+  share or the broadcasting key. Keplr and Zafu use the same approval
+  payload. Zafu is the Keplr-shaped browser signer (`window.zafu`). A
+  passkey is a WebAuthn assertion whose challenge is that digest. The
+  passkey authorizes the KMS. It is not the broadcasting key.
+- **S3. One grant.** The durable account submits one `MsgGrant` and one
+  feegrant allowance to the fresh ephemeral address. `SessionGrant` records
+  the grantee, the authz grant, the feegrant, the expiration, and the
+  scope. The earlier sentence that gave the session its own lower-quorum
+  threshold key is withdrawn for this track. The treasury remains the only
+  threshold key.
+- **S4. One allowlist per run.** The human approves the declared set once.
+  `authorize()` rejects a message outside that set before any signature.
+  Each broadcast is an audit line carrying the digest, the session id, and
+  the factor. The allowlist is message type URLs, code ids this run may
+  store, and a rule that instantiate and execute may name only contracts
+  this same run created. An address known before the run is an extra
+  explicit entry. A deploy cannot be a list of contract addresses, because
+  those addresses do not exist at approval time.
+
+Left out of this workflow: a second threshold ceremony for the session
+key, nested authz hops, a smart-account authenticator as the session
+primitive, a mode where Keplr or Zafu signs the chain transaction, and
+an approval that covers every message the script later builds.
+
+The treasury broadcast that lands the grant is the one signature that
+happens before the session exists. It uses the same page and the same
+digest approval. The treasury key stays inside the KMS.
+
+### Implementation workflow
+
+Build in this order. A later phase starts when the previous phase's
+tests pass. No phase adds a chain dependency it does not need.
+
+1. **Allowlist and `authorize()`, no network.** New module
+   `packages/cw-orch-kms/src/allowlist.rs`. Types for a message type URL,
+   a code id, and the created-contract rule. `authorize()` returns
+   `AuthorizationError` naming the digest, the principal, and the
+   offending type URL or contract. Unit tests: empty allowlist, a type
+   URL that was not declared, a contract this run did not create, a
+   declared type URL, and an execute of a contract the run just
+   instantiated. No axum. No grpc.
+
+2. **Session record, still no chain.** Extend
+   `packages/cw-orch-kms/src/session.rs`. `SessionGrant` gains the
+   allowlist, the factor, and the nonce. `Clock` is injected. The
+   ephemeral secp256k1 key is generated in the signer process, zeroized,
+   and redacted in `Debug`. Tests: expiry, revocation, and a second use
+   of the same nonce. A short quorum test is not part of this phase.
+   This key is not a FROST share.
+
+3. **Grant bytes.** New module `packages/cw-orch-kms/src/grant.rs`.
+   Build one `MsgGrant` and one feegrant whose allowlist is the run's
+   type URLs and whose expiration is the session expiration. Offline
+   tests decode the proto and check the grantee and the expiration.
+   This phase does not broadcast.
+
+4. **Loopback page with a test factor.** New module
+   `packages/cw-orch-kms/src/terminal.rs`. axum 0.8.9 (D9). Bind
+   `127.0.0.1` only. One self-contained HTML file and one WebSocket.
+   The test factor is an injected approver so the suite runs without a
+   browser wallet. The page renders the messages and the SHA-256.
+   Refusal emits no share, no nonce, and no signature. The listener
+   stops when the run drops it. Tests use the injected factor only.
+
+5. **Keplr, Zafu, and passkey on that page.** The HTML calls
+   `window.keplr` or `window.zafu` to sign the approval payload, and
+   `navigator.credentials.get` with the digest as the WebAuthn
+   challenge. The server checks the approval, then the ephemeral key
+   signs the chain sign-doc. The page has no API that returns the
+   ephemeral key. Tests for Keplr and Zafu feed a fixed approval
+   signature. The passkey test feeds a fixed assertion. A browser
+   extension is not required in CI.
+
+6. **Script API.** One builder on the crate root. The script declares
+   type URLs and code ids, chooses the factor, sets the TTL, and opens
+   the session. Upload and instantiate then go through the existing
+   `SenderBuilder`. A message the builder did not declare fails in
+   `authorize()` and is not broadcast.
+
+7. **Local exercise.** `packages/cw-orch-kms/tests/script_run.rs`,
+   feature `ict`, same harness as `tests/local_chain.rs`. The suite
+   starts the chain. Image `registry.terp.network/terp-core:v6.3.0`
+   arm64 from `05054d9`. Do not `docker load` the amd64 tar. One
+   approval covers a store and an instantiate. An execute of a contract
+   this run did not create fails closed. An expired session fails
+   closed. The treasury grant and the session broadcasts are separate
+   audit lines. Env: `TERP_IMAGE_VERSION=v6.3.0` and `ICT_FROST=1`.
+
+Done when phase 7 passes. The same `SenderBuilder` is what a later
+change points at mainnet. That change is not this workflow.
+
 ## Work order
 
 1. This page, the sweep, and the risk acceptance. Done in the commit that
    adds this file.
 2. Crate skeleton and domain newtypes. Not started. Blocked.
 3. Curve conversion module. Not started. Blocked.
-4. ECDSA finalizer. Blocked on the contradiction above. Nothing after this
-   milestone is started.
-5. DKG, Noise, `Signer`, differential test, policy, operator surface, session
-   grants, Shamir import, examples, the public docs pass on this page,
-   `docs/src/cli/keys.md`, and `CHANGELOG.md`.
+4. ECDSA finalizer. Blocked until a protocol crate is named. Scripting
+   authorization does not wait on it.
+5. Scripting authorization, phases 1–7 in
+   [Implementation workflow](#implementation-workflow). Next. ECDSA is
+   not a prerequisite.
+6. DKG, Noise, differential test, Shamir import, examples 01–08, the
+   public docs pass on this page, `docs/src/cli/keys.md`, and
+   `CHANGELOG.md`. After phase 7, or beside it only when a phase does
+   not need them. ECDSA stays blocked until a crate is named.
 
 ## Progress
 
@@ -309,3 +432,10 @@ Public traits `Signer`, `TxSender`, `SenderBuilder`, `CosmosOptions`, and
   CosmWasm authenticator, and `FrostKmsSender` broadcast a bank send whose
   signature is the Schnorr quorum. The contract's group verifying key matched
   the session. The amd64 tar was not loaded.
+- 2026-10-18. User locked scripting authorization. S1 one stack with
+  Keplr, Zafu, or a passkey on the loopback page. S2 the factor approves
+  a digest and the ephemeral key broadcasts. S3 one authz grant and one
+  feegrant, and the lower-quorum session threshold key is withdrawn for
+  this track. S4 one msg allowlist per run, including contracts this run
+  creates. The build order is the implementation workflow on this page.
+  No code for S1–S4 was started in this edit.
