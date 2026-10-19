@@ -3,11 +3,16 @@
 //! The quorum signs `SIGN_MODE_DIRECT` bytes. The chain selects the contract
 //! through `TxExtension.selected_authenticators`.
 
+mod allowlist;
 mod sender;
 mod session;
 mod tx_extension;
 mod wire;
 
+pub use allowlist::{
+    Authorization, AuthorizationError, Authorizer, Principal, RunAllowlist, SignDocDigest,
+    SigningRequest, MSG_EXECUTE, MSG_INSTANTIATE, MSG_STORE_CODE,
+};
 pub use sender::{FrostKmsOptions, FrostKmsSender};
 pub use session::FrostSession;
 pub use tx_extension::add_authenticator_any;

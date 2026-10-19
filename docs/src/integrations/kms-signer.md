@@ -439,3 +439,8 @@ change points at mainnet. That change is not this workflow.
   this track. S4 one msg allowlist per run, including contracts this run
   creates. The build order is the implementation workflow on this page.
   No code for S1–S4 was started in this edit.
+- 2026-10-19. Phase 1 landed in `packages/cw-orch-kms/src/allowlist.rs`.
+  `cargo test -p cw-orch-kms --lib -- allowlist` passed 8 tests: empty
+  allowlist, undeclared type URL, declared store, a contract this run did
+  not create, an execute of a contract this run created, a code id check
+  on instantiate, an explicit address, and a short digest. No chain.
