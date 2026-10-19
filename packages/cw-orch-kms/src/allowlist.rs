@@ -73,6 +73,10 @@ impl RunAllowlist {
     pub fn record_created(&mut self, address: impl Into<String>) {
         self.created.insert(address.into());
     }
+
+    pub fn type_urls(&self) -> Vec<String> {
+        self.type_urls.iter().cloned().collect()
+    }
 }
 
 /// One message the sender is about to sign.
@@ -183,10 +187,7 @@ impl Authorizer {
         if request.type_url == MSG_EXECUTE {
             let contract = request.contract.as_deref().unwrap_or("");
             if contract.is_empty() {
-                return Err(refuse(
-                    "execute missing contract",
-                    request.type_url.clone(),
-                ));
+                return Err(refuse("execute missing contract", request.type_url.clone()));
             }
             let known = self.allowlist.created.contains(contract)
                 || self.allowlist.explicit.contains(contract);

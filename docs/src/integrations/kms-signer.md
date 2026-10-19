@@ -444,3 +444,14 @@ change points at mainnet. That change is not this workflow.
   allowlist, undeclared type URL, declared store, a contract this run did
   not create, an execute of a contract this run created, a code id check
   on instantiate, an explicit address, and a short digest. No chain.
+- 2026-10-19. Phase 2 landed in `packages/cw-orch-kms/src/session.rs`.
+  `ScriptSession` holds one secp256k1 key, redacted in `Debug`, with an
+  injected `Clock`. `cargo test -p cw-orch-kms --lib -- session::tests`
+  passed the existing FROST quorum test and the new expiry, revocation,
+  and reused-nonce test. The key is not a FROST share. Grant bytes are
+  phase 3.
+- 2026-10-19. Phase 3 landed in `packages/cw-orch-kms/src/grant.rs`.
+  `build_session_grants` encodes one `MsgGrant` per allowlist type URL and
+  one `MsgGrantAllowance`. `cargo test -p cw-orch-kms --lib -- grant::`
+  passed. The bytes name the grantee, the type URLs, and the session
+  expiration. Nothing is broadcast. Phase 4 is the loopback page.
