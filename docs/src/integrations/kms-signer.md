@@ -455,3 +455,10 @@ change points at mainnet. That change is not this workflow.
   one `MsgGrantAllowance`. `cargo test -p cw-orch-kms --lib -- grant::`
   passed. The bytes name the grantee, the type URLs, and the session
   expiration. Nothing is broadcast. Phase 4 is the loopback page.
+- 2026-10-19. Phase 4 landed in `packages/cw-orch-kms/src/terminal.rs`.
+  axum 0.8.9 serves one HTML page and one WebSocket on `127.0.0.1` only.
+  `TestApprover` accepts the test factor. Keplr, Zafu, and passkey are
+  refused. A refusal frame is the word `refused` and carries no nonce
+  and no signature. Dropping `Terminal` stops the listener.
+  `cargo test -p cw-orch-kms --lib -- terminal::` passed 5 tests. Phase 5
+  is the real factors on that page.

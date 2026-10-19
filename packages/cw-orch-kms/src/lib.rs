@@ -7,6 +7,7 @@ mod allowlist;
 mod grant;
 mod sender;
 mod session;
+mod terminal;
 mod tx_extension;
 mod wire;
 
@@ -17,5 +18,6 @@ pub use allowlist::{
 pub use grant::{build_session_grants, SessionGrants};
 pub use sender::{FrostKmsOptions, FrostKmsSender};
 pub use session::{ApprovalFactor, Clock, FrostSession, ScriptSession, SessionGrant};
+pub use terminal::{listen, ApprovalView, Approver, Terminal, TerminalOutcome, TestApprover};
 pub use tx_extension::add_authenticator_any;
 pub use wire::{encode_group_vk, verify_group_signature, FROST_SIG_LEN};
