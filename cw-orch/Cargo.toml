@@ -22,7 +22,7 @@ default = []
 daemon           = ["dep:tokio", "dep:cosmrs", "dep:cw-orch-daemon", "dep:cw-orch-networks"]
 eth              = ["daemon", "cw-orch-core/eth", "cw-orch-daemon?/eth"]
 snapshot-testing = ["dep:insta", "dep:sanitize-filename"]
-zk               = ["cosmwasm-std/zk", "cw-orch-core/zk",  "cw-orch-daemon/zk"]
+zk               = ["cosmwasm-std/zk", "cw-orch-core/zk", "cw-orch-daemon/zk"]
 
 [dependencies]
 # Derive
@@ -62,14 +62,14 @@ tokio            = { workspace = true, features = ["full"], optional = true }
 tonic = { workspace = true, optional = true, features = ["transport"] }
 
 [dev-dependencies]
-cosmwasm-schema = { path = "../../cosmwasm/packages/schema" }
+cosmwasm-schema = { version = "=4.0.0-zk" }
 counter-contract  = { path = "../contracts-ws/contracts/counter" }
 cw-orch = { path = "." }
 dotenv            = "0.15.0"
 env_logger        = "0.11.5"
 mock-contract     = { path = "../contracts-ws/contracts/mock_contract" }
 mock-contract-u64 = { path = "../contracts-ws/contracts/mock_contract_u64" }
-osmosis-std = { path = "../../osmosis-rust/packages/osmosis-std" }
+osmosis-std = { version = "0.26.0" }
 prost             = { workspace = true }
 prost-types       = { workspace = true }
 serde_json        = { workspace = true }

@@ -81,10 +81,10 @@ libc-print = "0.1.23"
 toml       = "0.8"
 
 [dev-dependencies]
-cw20 = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-plus", branch = "v3.1.0-zk.0", package = "cw20" }
-cw20-base = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cw-plus", branch = "v3.1.0-zk.0", package = "cw20-base" }
+cw20 = { package = "cw20", version = "3.0.0" }
+cw20-base = { package = "cw20-base", version = "3.0.0" }
 
-cosmwasm-schema = { git = "ssh://returniflost@groot-wan/Users/returniflost/abstract/terp-core/crates/cosmwasm", branch = "v3.1.0-zk.0", package = "cosmwasm-schema" }
+cosmwasm-schema = { package = "cosmwasm-schema", version = "=4.0.0-zk" }
 ctor            = "0.2.8"
 cw-orch = { path = "../cw-orch" }
 cw-orch-daemon = { path = "." }

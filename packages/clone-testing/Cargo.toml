@@ -28,11 +28,11 @@ tokio     = { workspace = true }
 tonic     = { workspace = true }
 
 [dev-dependencies]
-cosmwasm-schema = { path = "../../../cosmwasm/packages/schema" }
+cosmwasm-schema = { version = "=4.0.0-zk" }
 speculoos       = { workspace = true }
 
-cw20 = { path = "../../../cw-plus/packages/cw20" }
-cw20-base = { path = "../../../cw-plus/contracts/cw20-base" }
+cw20 = { version = "3.0.0" }
+cw20-base = { version = "3.0.0" }
 
 counter-contract  = { path = "../../contracts-ws/contracts/counter" }
 cw-orch = { path = "../../cw-orch" }

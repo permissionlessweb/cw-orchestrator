@@ -18,7 +18,7 @@ cw-orch-daemon = { workspace = true }
 async-recursion = "1.1.1"
 base64            = "0.22.1"
 cosmrs            = { workspace = true }
-cosmwasm-schema = { path = "../../../../cosmwasm/packages/schema" }
+cosmwasm-schema = { version = "=4.0.0-zk" }
 ibc-proto        = { workspace = true }
 tokio = { workspace = true }
 

@@ -22,11 +22,11 @@ osst = { path = "../../../zeratul/crates/osst", default-features = false, featur
 prost = { workspace = true }
 rand = "0.8"
 tokio = { workspace = true }
-# Pins keep cosmrs/reqwest on the lockfile's wasm-bindgen set. Newer
-# web-sys 0.3.105 and wasm-bindgen-futures 0.4.76 disagree on js-sys.
-js-sys = "=0.3.95"
-web-sys = "=0.3.95"
-wasm-bindgen-futures = "=0.4.68"
+# These three publish as one set. Each exact js-sys pins one wasm-bindgen.
+# wasmer 7.4.2 needs wasm-bindgen ^0.2.120, which starts at js-sys 0.3.97.
+js-sys = "=0.3.106"
+web-sys = "=0.3.106"
+wasm-bindgen-futures = "=0.4.79"
 ict-rs = { path = "../../../ict-rs/ict-rs", optional = true, default-features = false, features = ["docker", "terp", "testing"] }
 ict-rs-cw-orch = { path = "../../../ict-rs/ict-rs-cw-orch", optional = true, default-features = false }
 
