@@ -15,6 +15,7 @@ pub const TERP_TESTNET: ChainInfo = ChainInfo {
     gas_denom: "uterp",
     gas_price: 0.05,
     grpc_urls: &["https://testnet-grpc.terp.network"],
+    rpc_urls: &[],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,
@@ -26,6 +27,7 @@ pub const TERP_MAINNET: ChainInfo = ChainInfo {
     gas_denom: "uthiol",
     gas_price: 0.05,
     grpc_urls: &["http://192.168.1.104:9090"],
+    rpc_urls: &[],
     network_info: TERP_NETWORK,
     lcd_url: None,
     fcd_url: None,
@@ -37,6 +39,7 @@ pub const TERP_LOCALNET: ChainInfo = ChainInfo {
     gas_denom: "uterp",
     gas_price: 0.025,
     grpc_urls: &[],
+    rpc_urls: &[],
     network_info: NetworkInfo {
         chain_name: "terp",
         pub_address_prefix: "terp",

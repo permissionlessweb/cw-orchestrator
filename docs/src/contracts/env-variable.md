@@ -19,11 +19,11 @@ You can provide mnemonics directly to the `Daemon` using the following environme
 ### STATE_FILE
 
 Optional, accepted values: Path to a valid file
-Default value: `~./cw-orchestrator/state.json`
+Default value: `~/.cw-orch/state.json`
 
 This environment variable indicates the location of the state file that `cw-orch` will use to save on-chain state (addresses and code ids). Here is the behavior of this env variable:
 
-- `folder/file.json` will resolve to `~/.cw-orchestrator/folder/file.json`
+- `folder/file.json` will resolve to `~/.cw-orch/folder/file.json`
 - `./folder/file.json` will resolve `$pwd/folder/file.json`
 - `../folder/file.json` will resolve `$pwd/../folder/file.json`
 - `/usr/var/file.json` will resolve to `/usr/var/file.json`

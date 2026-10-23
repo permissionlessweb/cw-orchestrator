@@ -10,5 +10,5 @@ pub mod log;
 pub use error::CwEnvError;
 pub use serde_json;
 
-// #[cfg(feature = "zk")]
+#[cfg(feature = "zk")]
 pub mod circuits;

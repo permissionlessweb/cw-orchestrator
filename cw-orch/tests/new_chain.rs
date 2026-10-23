@@ -13,6 +13,7 @@ pub const NEW_CHAIN_INFO: ChainInfo = ChainInfo {
     gas_denom: "uosmo",
     gas_price: 7575.8,
     grpc_urls: &["Some GRPC URLS"],
+    rpc_urls: &[],
     lcd_url: None, // Not necessary for cw-orch
     fcd_url: None, // Not necessary for cw-orch
     network_info: NEW_NETWORK_INFO,

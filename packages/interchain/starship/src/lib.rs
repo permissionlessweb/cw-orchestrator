@@ -106,6 +106,7 @@ fn chain_data_conversion(chain: ChainData) -> ChainInfoOwned {
         gas_denom: chain.fees.fee_tokens[0].denom.clone(),
         gas_price: chain.fees.fee_tokens[0].average_gas_price,
         grpc_urls: chain.apis.grpc.into_iter().map(|g| g.address).collect(),
+        rpc_urls: vec![],
         lcd_url: Some(chain.apis.rest.into_iter().map(|l| l.address).collect()),
         fcd_url: None,
         network_info: NetworkInfoOwned {

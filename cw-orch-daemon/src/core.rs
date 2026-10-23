@@ -241,6 +241,11 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
     }
 
     /// Execute a message on a contract.
+    ///
+    /// The wasm sender is the signing account, the same account instantiate2
+    /// names. An authz granter wraps the transaction in `MsgExec` and is not
+    /// the contract caller. Naming the granter here fails the contract owner
+    /// check when that owner is the signing account.
     pub async fn execute<E: Serialize>(
         &self,
         exec_msg: &E,
@@ -248,7 +253,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         contract_address: &Addr,
     ) -> Result<CosmTxResponse, DaemonError> {
         let exec_msg: MsgExecuteContract = MsgExecuteContract {
-            sender: self.sender().msg_sender().map_err(Into::into)?,
+            sender: self.sender().account_id(),
             contract: AccountId::from_str(contract_address.as_str())?,
             msg: serde_json::to_vec(&exec_msg)?,
             funds: parse_cw_coins(coins)?,
@@ -276,7 +281,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
             code_id,
             label: Some(label.unwrap_or("instantiate_contract").to_string()),
             admin: admin.map(|a| FromStr::from_str(a.as_str()).unwrap()),
-            sender: self.sender().msg_sender().map_err(Into::into)?,
+            sender: self.sender().account_id(),
             msg: serde_json::to_vec(&init_msg)?,
             funds: parse_cw_coins(coins)?,
         };
@@ -338,7 +343,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         contract_address: &Addr,
     ) -> Result<CosmTxResponse, DaemonError> {
         let exec_msg: MsgMigrateContract = MsgMigrateContract {
-            sender: self.sender().msg_sender().map_err(Into::into)?,
+            sender: self.sender().account_id(),
             contract: AccountId::from_str(contract_address.as_str())?,
             msg: serde_json::to_vec(&migrate_msg)?,
             code_id: new_code_id,
@@ -399,6 +404,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
     ) -> Result<CosmTxResponse, DaemonError> {
         let wasm_path = <T as Uploadable>::wasm(self.chain_info());
 
+        println!("store {}", wasm_path.path().display());
         log::debug!(target: &transaction_target(), "Uploading file at {:?}", wasm_path);
 
         let result = upload_wasm(self.sender(), wasm_path, access).await?;
@@ -406,6 +412,7 @@ impl<Sender: TxSender> DaemonAsyncBase<Sender> {
         log::info!(target: &transaction_target(), "Uploading done: {:?}", result.txhash);
 
         let code_id = result.uploaded_code_id().unwrap();
+        println!("stored code {code_id} tx {}", result.txhash);
 
         // wait for the node to return the contract information for this upload
         let wasm = CosmWasm::new_async(self.channel());
@@ -421,10 +428,37 @@ pub async fn upload_wasm<T: TxSender>(
     wasm_path: WasmPath,
     access: Option<AccessConfig>,
 ) -> Result<CosmTxResponse, DaemonError> {
+    upload_wasm_with(sender, wasm_path, access, true).await
+}
+
+/// Store the wasm bytes as they are on disk.
+///
+/// `StoreCodeAuthorization.Accept` charges gzip decompression only when a wasm
+/// gas register is already on the context. Authz execution does not carry that
+/// register, so a gzipped store is rejected before the checksum is checked.
+/// The grant checksum is the hash of these uncompressed bytes.
+pub async fn upload_wasm_plain<T: TxSender>(
+    sender: &T,
+    wasm_path: WasmPath,
+    access: Option<AccessConfig>,
+) -> Result<CosmTxResponse, DaemonError> {
+    upload_wasm_with(sender, wasm_path, access, false).await
+}
+
+async fn upload_wasm_with<T: TxSender>(
+    sender: &T,
+    wasm_path: WasmPath,
+    access: Option<AccessConfig>,
+    gzip: bool,
+) -> Result<CosmTxResponse, DaemonError> {
     let file_contents = std::fs::read(wasm_path.path())?;
-    let mut e = write::GzEncoder::new(Vec::new(), Compression::default());
-    e.write_all(&file_contents)?;
-    let wasm_byte_code = e.finish()?;
+    let wasm_byte_code = if gzip {
+        let mut e = write::GzEncoder::new(Vec::new(), Compression::default());
+        e.write_all(&file_contents)?;
+        e.finish()?
+    } else {
+        file_contents
+    };
     let store_msg = cosmrs::cosmwasm::MsgStoreCode {
         sender: sender.msg_sender().map_err(Into::into)?,
         wasm_byte_code,

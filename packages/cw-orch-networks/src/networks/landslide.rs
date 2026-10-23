@@ -13,6 +13,7 @@ pub const LOCAL_LANDSLIDE: ChainInfo = ChainInfo {
     gas_denom: "stake",
     gas_price: 1_f64,
     grpc_urls: &["http://127.0.0.1:9090"],
+    rpc_urls: &[],
     network_info: LANDSLIDE_NETWORK,
     lcd_url: None,
     fcd_url: None,

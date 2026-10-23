@@ -13,6 +13,7 @@ pub const NIBIRU_ITN_2: ChainInfo = ChainInfo {
     gas_denom: "unibi",
     gas_price: 0.025,
     grpc_urls: &["https://nibiru-testnet.grpc.kjnodes.com:443"],
+    rpc_urls: &[],
     network_info: NIBIRU_NETWORK,
     lcd_url: None,
     fcd_url: None,

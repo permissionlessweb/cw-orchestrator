@@ -7,20 +7,29 @@ license = "LGPL-3.0"
 
 [features]
 default = []
-ict = ["dep:ict-rs", "dep:ict-rs-cw-orch"]
+ict = ["dep:ict-rs", "dep:ict-rs-cw-orch", "dep:bip39"]
 
 [dependencies]
 cosmrs = { workspace = true, features = ["cosmwasm", "grpc"] }
+cosmos-sdk-proto = { workspace = true }
+tendermint-proto = { workspace = true }
 cosmwasm-std = { workspace = true }
 cw-orch-core = { workspace = true }
 cw-orch-daemon = { workspace = true }
 axum = { version = "=0.8.9", features = ["ws"] }
+base64 = "0.22.1"
+bech32 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
+ripemd = "0.1.3"
+sha2 = { workspace = true }
+flate2 = "1"
 tonic = { workspace = true }
 tonic-prost = "=0.14.5"
 http = "1"
 chrono = "0.4"
 osst = { path = "../../../zeratul/crates/osst", default-features = false, features = ["secp256k1"] }
 prost = { workspace = true }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 rand = "0.8"
 tokio = { workspace = true }
 # These three publish as one set. Each exact js-sys pins one wasm-bindgen.
@@ -28,12 +37,12 @@ tokio = { workspace = true }
 js-sys = "=0.3.106"
 web-sys = "=0.3.106"
 wasm-bindgen-futures = "=0.4.79"
+bip39 = { version = "2.0.0", features = ["rand"], optional = true }
 ict-rs = { path = "../../../ict-rs/ict-rs", optional = true, default-features = false, features = ["docker", "terp", "testing"] }
 ict-rs-cw-orch = { path = "../../../ict-rs/ict-rs-cw-orch", optional = true, default-features = false }
 
 [dev-dependencies]
 anyhow = "1"
-flate2 = "1"
 futures-util = "0.3"
 serde_json = "1"
 tokio = { workspace = true }

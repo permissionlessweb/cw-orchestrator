@@ -22,7 +22,10 @@ pub struct CosmosOptions {
 #[derive(Default, Clone)]
 pub enum CosmosWalletKey {
     Mnemonic(String),
+    /// BIP32 seed. Derived at `m/44'/coin_type'/0'/0/index`. Not a keyring export.
     RawKey(Vec<u8>),
+    /// Already-derived 32-byte secp256k1 secret, as returned by a keyring hex export.
+    Secp256k1(Vec<u8>),
     #[default]
     Env,
 }
@@ -57,6 +60,12 @@ impl CosmosOptions {
 
     pub fn mnemonic(mut self, mnemonic: impl Into<String>) -> Self {
         self.key = CosmosWalletKey::Mnemonic(mnemonic.into());
+        self
+    }
+
+    /// Sign with an already-derived secp256k1 secret. Does not HD-derive it.
+    pub fn secp256k1_secret(mut self, secret: impl Into<Vec<u8>>) -> Self {
+        self.key = CosmosWalletKey::Secp256k1(secret.into());
         self
     }
 

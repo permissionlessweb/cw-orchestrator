@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use cw_orch_core::environment::ChainInfoOwned;
 
-use crate::env::default_state_folder;
+use crate::env::default_networks_folder;
 
-/// Reads network config from `~/.cw-orchestrator/networks.toml` and returns the config for the chain id
+/// Reads network config from `~/.cw-orchestrator/networks.toml` and returns the config for the chain id.
+/// The public deployment state is `~/.cw-orch/state.json` and does not move this file.
 pub fn read_network_config(chain_id: &str) -> Option<ChainInfoOwned> {
-    let mut state_folder = default_state_folder().ok()?;
+    let mut state_folder = default_networks_folder().ok()?;
     state_folder.push("networks.toml");
     let file_content = std::fs::read_to_string(state_folder).ok()?;
 
@@ -37,6 +38,7 @@ mod test {
             gas_denom: "gas_denom".to_owned(),
             gas_price: 64f64,
             grpc_urls: vec!["http://juno-grpc.com:123".to_owned()],
+            rpc_urls: vec![],
             lcd_url: Some("http://juno-lcd.com:321".to_owned()),
             fcd_url: Some("http://juno-fcd.com:234".to_owned()),
             network_info: NetworkInfoOwned {
@@ -77,6 +79,7 @@ mod test {
             gas_denom: "ujuno".to_owned(),
             gas_price: 0.0750,
             grpc_urls: vec!["http://juno-grpc.polkachu.com:12690".to_owned()],
+            rpc_urls: vec![],
             network_info: NetworkInfoOwned {
                 chain_name: "juno".to_owned(),
                 pub_address_prefix: "juno".to_owned(),

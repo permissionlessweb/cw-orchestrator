@@ -13,6 +13,7 @@ pub const AKASH_MAINNET: ChainInfo = ChainInfo {
     gas_denom: "uakt",
     gas_price: 0.025,
     grpc_urls: &["https://akash-grpc.publicnode.com:443"],
+    rpc_urls: &[],
     network_info: AKASH_NETWORK,
     lcd_url: None,
     fcd_url: None,

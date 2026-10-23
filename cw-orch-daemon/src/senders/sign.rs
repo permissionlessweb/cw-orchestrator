@@ -17,7 +17,6 @@ use cosmrs::{
     AccountId, Any,
 };
 use cosmwasm_std::Addr;
-use prost::Message;
 
 pub struct SigningAccount {
     pub account_number: u64,
@@ -52,6 +51,16 @@ pub trait Signer: QuerySender<Error = DaemonError> + Sync {
 
     fn gas_price(&self) -> Result<f64, DaemonError>;
 
+    /// CometBFT RPC endpoints used when gRPC fails.
+    fn rpc_urls(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// LCD REST endpoint used when gRPC fails.
+    fn lcd_url(&self) -> Option<String> {
+        None
+    }
+
     /// Computes the gas needed for submitting a transaction
     fn calculate_gas(
         &self,
@@ -72,10 +81,20 @@ pub trait Signer: QuerySender<Error = DaemonError> + Sync {
             )?;
 
             let tx_raw = self.sign(sign_doc)?;
+            let tx_bytes = tx_raw.to_bytes()?;
 
-            Node::new_async(self.channel())
-                ._simulate_tx(tx_raw.to_bytes()?)
-                .await
+            match Node::new_async(self.channel())._simulate_tx(tx_bytes.clone()).await {
+                Ok(gas) => Ok(gas),
+                Err(err) if crate::http_broadcast::is_transport_error(&err) => {
+                    crate::http_broadcast::simulate_or_fallback(
+                        &tx_bytes,
+                        self.lcd_url().as_deref(),
+                        &err,
+                    )
+                    .await
+                }
+                Err(err) => Err(err),
+            }
         }
     }
 }
@@ -83,6 +102,14 @@ pub trait Signer: QuerySender<Error = DaemonError> + Sync {
 impl<T: Signer + Sync> TxSender for T {
     fn account_id(&self) -> cosmrs::AccountId {
         self.account_id()
+    }
+
+    fn rpc_urls(&self) -> Vec<String> {
+        Signer::rpc_urls(self)
+    }
+
+    fn lcd_url(&self) -> Option<String> {
+        Signer::lcd_url(self)
     }
 
     async fn commit_tx_any(
@@ -122,14 +149,22 @@ impl<T: Signer + Sync> TxSender for T {
             .broadcast(tx_builder, self)
             .await?;
 
-        let resp = Node::new_async(self.channel())
-            ._find_tx(tx_response.txhash)
-            .await?;
+        let hash = tx_response.txhash.clone();
+        let resp = match Node::new_async(self.channel())._find_tx(hash.clone()).await {
+            Ok(response) => response,
+            Err(err) if crate::http_broadcast::is_transport_error(&err) => {
+                println!("grpc tx query failed: {err}");
+                crate::http_broadcast::find_tx(&hash, &self.rpc_urls(), self.lcd_url().as_deref())
+                    .await?
+            }
+            Err(err) => return Err(err),
+        };
 
         assert_broadcast_code_cosm_response(resp)
     }
-    /// Actual sender of the messages.
-    /// This is different when using authz capabilites
+    /// Account named inside authz-wrapped bank and store messages.
+    /// Wasm execute, instantiate, and migrate use the signing account instead.
+    /// The granter is the `MsgExec` authority, not the contract caller.
     fn msg_sender(&self) -> Result<AccountId, DaemonError> {
         if let Some(sender) = self.authz_granter() {
             Ok(sender.as_str().parse()?)

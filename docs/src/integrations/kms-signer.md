@@ -328,7 +328,14 @@ tests pass. No phase adds a chain dependency it does not need.
    Build one `MsgGrant` and one feegrant whose allowlist is the run's
    type URLs and whose expiration is the session expiration. Offline
    tests decode the proto and check the grantee and the expiration.
-   This phase does not broadcast.
+   `plan_session_setup` compares an existing grant with this session. When
+   the grant does not cover the run it builds the amino setup, revokes
+   first. A wallet catalog is larger than one Zigner code, so
+   `enable_approval` signs and broadcasts one legacy-amino transaction per
+   code, with the next account sequence on each. It then sets the daemon's
+   authz granter and fee granter. Later messages in that process are
+   `MsgExec`, paid by the feegrant. `DaemonApproval::approve_granter` is
+   that path with the wallet catalog already selected.
 
 4. **Loopback page with a test factor.** New module
    `packages/cw-orch-kms/src/terminal.rs`. axum 0.8.9 (D9). Bind
@@ -339,13 +346,13 @@ tests pass. No phase adds a chain dependency it does not need.
    stops when the run drops it. Tests use the injected factor only.
 
 5. **Keplr, Zafu, and passkey on that page.** The HTML calls
-   `window.keplr` or `window.zafu` to sign the approval payload, and
-   `navigator.credentials.get` with the digest as the WebAuthn
-   challenge. The server checks the approval, then the ephemeral key
+   `window.zafu` to amino-sign the approval payload. The Zafu popup
+   lists mnemonic vaults and labels a memo of `cw-orch-approval:v1` as
+   a cw-orch run approval. Keplr and `navigator.credentials.get` are
+   still open. The server checks the approval, then the ephemeral key
    signs the chain sign-doc. The page has no API that returns the
-   ephemeral key. Tests for Keplr and Zafu feed a fixed approval
-   signature. The passkey test feeds a fixed assertion. A browser
-   extension is not required in CI.
+   ephemeral key. Tests for Zafu feed a fixed approval signature. A
+   browser extension is not required in CI.
 
 6. **Script API.** One builder on the crate root. The script declares
    type URLs and code ids, chooses the factor, sets the TTL, and opens
@@ -462,3 +469,57 @@ change points at mainnet. That change is not this workflow.
   and no signature. Dropping `Terminal` stops the listener.
   `cargo test -p cw-orch-kms --lib -- terminal::` passed 5 tests. Phase 5
   is the real factors on that page.
+- 2026-10-20. Zafu is the first phase 5 factor. The loopback page calls
+  `window.zafu.signAmino` on a `cw-orch-approval:v1` amino document. The
+  one-time value is the `approval` line. The server rebuilds that
+  document and checks the secp256k1 signature. `approve test` still
+  approves with no signer. A bare `approve zafu` is still refused.
+  Zafu's approval popup lists mnemonic vaults and Zigner vaults that
+  exported a cosmos key. A Zigner approval shows the cosmos QR and scans
+  the 64-byte signature. The amino document includes each action, and the
+  popup shows one block per action. A toggle decodes base64 and hex fields
+  inside those actions, including JSON text, and splits a nested action
+  list into its own blocks. The device signs those bytes. It does not
+  submit the transaction. A vault that is not the connected account is
+  refused before it signs. Keplr and the passkey are still open.
+  Upstream Zafu `main` is `4e0b9e28`.
+  `cargo test -p cw-orch-kms --lib -- terminal::` passed 7 tests.
+- 2026-10-20. Opt-in session setup. `ScriptSession::open_with_key` reuses
+  one ephemeral secp256k1 key across runs. `plan_session_setup` returns
+  ready when that grantee's authz and feegrant already cover this run's
+  type URLs, expiration, denom, and spend limit. Otherwise it returns one
+  amino sign document, memo `cw-orch-session:v1`, with the cold key's real
+  account number, sequence, chain id, and fee. Revokes come first, then
+  the new grants. The cold key signs that document. This crate does not
+  submit it. `cargo test -p cw-orch-kms --lib -- grant:: session::tests`
+  passed 9 tests. Zigner shows Grant, Revoke, Fee grant, and Revoke fee
+  grant as their own cards.
+- 2026-10-21. `enable_approval` is the daemon helper for that setup
+  transaction. The daemon wallet is the grantee. The cold address is the
+  granter. A covering grant skips the page. Otherwise the page serves the
+  real amino bytes (memo `cw-orch-session:v1`), the script broadcasts
+  `SIGN_MODE_LEGACY_AMINO_JSON`, then store-code uploads run as `MsgExec`.
+  `dao-scripts` bin `dao_upload` calls `DaoDaoSuite::upload_if_needed`
+  after that. On Terp the suite stores
+  `cw_tokenfactory_issuer-osmosis.wasm`,
+  `dao_voting_token_staked-default.wasm`, and `cw_vesting-staking.wasm`.
+  `ApprovalSession::wallet` and `DaemonApproval::approve_granter` grant the
+  sdk 0.55, ibc-go v11, wasmd, and Terp module type URLs. A catalog that
+  does not fit one Zigner code is signed as successive sequences. Authz
+  queries follow `next_key`. `cw-orch-hermes-relayer` (feature `hermes`)
+  creates channels and relays packets, ported from cw-orchestrator pull 427
+  onto local Hermes 0.32.2.
+  `dao_upload --spawn` boots image `v6.3.0` (or `TERP_IMAGE_VERSION`) as
+  chain `240u-1`, funds `LOCAL_MNEMONIC` and the granter, then runs
+  `DaoDaoSuite::on_spawn` before upload. The granter flag reads
+  `CW_ORCH_GRANTER`.
+- 2026-10-20. The loopback page also shows one section per action, a Zigner
+  amino QR for account 0 on chain name `terp`, and a paste check. The
+  socket command is `check` plus a pubkey and a signature, each hex or
+  base64. A bad check stays on the socket. A good check replies
+  `valid` and the terp address. `cargo test -p cw-orch-kms --lib -- terminal::`
+  passed 8 tests. Zigner source lists Terp next to Zcash and Penumbra when
+  a key is created, derives a `terp1` address, and shows each cw-orch
+  action on the device. That build is not on the phone. The installed
+  release is still v0.11.3. This Mac has platform-tools and no Android SDK,
+  so the new APK has not been assembled.

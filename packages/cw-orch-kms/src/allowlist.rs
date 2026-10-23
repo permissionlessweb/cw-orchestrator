@@ -5,7 +5,19 @@ use std::fmt;
 
 pub const MSG_STORE_CODE: &str = "/cosmwasm.wasm.v1.MsgStoreCode";
 pub const MSG_INSTANTIATE: &str = "/cosmwasm.wasm.v1.MsgInstantiateContract";
+pub const MSG_INSTANTIATE2: &str = "/cosmwasm.wasm.v1.MsgInstantiateContract2";
 pub const MSG_EXECUTE: &str = "/cosmwasm.wasm.v1.MsgExecuteContract";
+pub const MSG_MIGRATE: &str = "/cosmwasm.wasm.v1.MsgMigrateContract";
+
+/// One contract the session may call. `keys` empty means every execute key.
+/// `funds` empty means the call attaches no coins.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScopedCall {
+    pub address: String,
+    pub keys: Vec<String>,
+    pub calls: u64,
+    pub funds: Vec<(String, u128)>,
+}
 
 /// SHA-256 of the sign-doc bytes, 64 lowercase hex characters.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,12 +63,95 @@ pub struct RunAllowlist {
     code_ids: BTreeSet<u64>,
     created: BTreeSet<String>,
     explicit: BTreeSet<String>,
+    /// Lowercase hex SHA-256 of each Wasm module this session may store.
+    stores: BTreeSet<String>,
+    executes: Vec<ScopedCall>,
+    migrates: Vec<ScopedCall>,
 }
 
 impl RunAllowlist {
     pub fn allow_type(mut self, type_url: impl Into<String>) -> Self {
         self.type_urls.insert(type_url.into());
         self
+    }
+
+    /// Store this Wasm and nothing else. The checksum is the SHA-256 the
+    /// chain computes after gunzip.
+    pub fn allow_store(mut self, wasm: &[u8]) -> Result<Self, String> {
+        let sum = wasm_checksum(wasm)?;
+        self.stores.insert(hex_encode(&sum));
+        self.type_urls.insert(MSG_STORE_CODE.into());
+        Ok(self)
+    }
+
+    pub fn allow_execute(mut self, call: ScopedCall) -> Result<Self, String> {
+        if call.address.is_empty() {
+            return Err("grant refused: execute needs a contract address".into());
+        }
+        if call.calls == 0 {
+            return Err("grant refused: execute needs at least one call".into());
+        }
+        self.type_urls.insert(MSG_EXECUTE.into());
+        self.explicit.insert(call.address.clone());
+        self.executes.push(call);
+        Ok(self)
+    }
+
+    pub fn allow_migrate(mut self, call: ScopedCall) -> Result<Self, String> {
+        if call.address.is_empty() {
+            return Err("grant refused: migrate needs a contract address".into());
+        }
+        if call.calls == 0 {
+            return Err("grant refused: migrate needs at least one call".into());
+        }
+        self.type_urls.insert(MSG_MIGRATE.into());
+        self.explicit.insert(call.address.clone());
+        self.migrates.push(call);
+        Ok(self)
+    }
+
+    pub fn allow_store_checksum(mut self, hex_checksum: impl Into<String>) -> Self {
+        self.stores.insert(hex_checksum.into());
+        self.type_urls.insert(MSG_STORE_CODE.into());
+        self
+    }
+
+    pub fn allow_execute_unchecked(mut self, call: ScopedCall) -> Self {
+        self.type_urls.insert(MSG_EXECUTE.into());
+        self.explicit.insert(call.address.clone());
+        self.executes.push(call);
+        self
+    }
+
+    pub fn allow_migrate_unchecked(mut self, call: ScopedCall) -> Self {
+        self.type_urls.insert(MSG_MIGRATE.into());
+        self.explicit.insert(call.address.clone());
+        self.migrates.push(call);
+        self
+    }
+
+    pub fn stores(&self) -> Vec<String> {
+        self.stores.iter().cloned().collect()
+    }
+
+    pub fn executes(&self) -> &[ScopedCall] {
+        &self.executes
+    }
+
+    pub fn migrates(&self) -> &[ScopedCall] {
+        &self.migrates
+    }
+
+    pub fn has_store_scope(&self) -> bool {
+        !self.stores.is_empty()
+    }
+
+    pub fn has_execute_scope(&self) -> bool {
+        !self.executes.is_empty()
+    }
+
+    pub fn has_migrate_scope(&self) -> bool {
+        !self.migrates.is_empty()
     }
 
     pub fn allow_code(mut self, code_id: u64) -> Self {
@@ -85,6 +180,9 @@ pub struct SigningRequest {
     pub type_url: String,
     pub contract: Option<String>,
     pub code_id: Option<u64>,
+    /// JSON text of the message body the cold key is signing. Empty when the
+    /// run has only declared the type.
+    pub body: Option<String>,
 }
 
 impl SigningRequest {
@@ -93,7 +191,13 @@ impl SigningRequest {
             type_url: type_url.into(),
             contract: None,
             code_id: None,
+            body: None,
         }
+    }
+
+    pub fn body(mut self, json: impl Into<String>) -> Self {
+        self.body = Some(json.into());
+        self
     }
 
     pub fn contract(mut self, address: impl Into<String>) -> Self {
@@ -206,17 +310,62 @@ impl Authorizer {
     }
 }
 
-fn digest() -> SignDocDigest {
-    SignDocDigest::new("ab".repeat(32)).expect("64 hex")
+/// Contract address `MsgInstantiateContract2` will use.
+///
+/// `creator` is the canonical account that sends the instantiate, the
+/// ephemeral grantee. `msg` is empty, matching wasmd when `fix_msg` is unset.
+/// The result is 32 bytes, this chain's contract address length.
+pub fn instantiate2_bech32(
+    prefix: &str,
+    checksum: &[u8],
+    creator: &[u8],
+    salt: &[u8],
+) -> Result<String, String> {
+    let canonical = cosmwasm_std::CanonicalAddr::from(creator);
+    let raw = cosmwasm_std::instantiate2_address(checksum, &canonical, salt)
+        .map_err(|err| format!("instantiate2 address refused: {err}"))?;
+    let hrp = bech32::Hrp::parse(prefix).map_err(|err| format!("instantiate2 address refused: {err}"))?;
+    bech32::encode::<bech32::Bech32>(hrp, raw.as_slice())
+        .map_err(|err| format!("instantiate2 address refused: {err}"))
 }
 
-fn principal() -> Principal {
-    Principal::new("treasury").expect("principal")
+/// SHA-256 of the Wasm module. A gzip wrapper is removed first, because
+/// wasmd checksums the bytes after gunzip.
+pub fn wasm_checksum(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let raw = if bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b {
+        let mut decoder = flate2::read::GzDecoder::new(bytes);
+        let mut out = Vec::new();
+        std::io::Read::read_to_end(&mut decoder, &mut out)
+            .map_err(|err| format!("grant refused: wasm gzip: {err}"))?;
+        out
+    } else {
+        bytes.to_vec()
+    };
+    use sha2::Digest;
+    Ok(sha2::Sha256::digest(&raw).to_vec())
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0xf) as usize] as char);
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn digest() -> SignDocDigest {
+        SignDocDigest::new("ab".repeat(32)).expect("64 hex")
+    }
+
+    fn principal() -> Principal {
+        Principal::new("treasury").expect("principal")
+    }
 
     #[test]
     fn empty_allowlist_rejects() {

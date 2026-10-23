@@ -471,7 +471,7 @@ pub mod test {
         assert_eq!(
             dirs::home_dir()
                 .unwrap()
-                .join(".cw-orchestrator")
+                .join(".cw-orch")
                 .join(relative_path)
                 .into_os_string()
                 .into_string()

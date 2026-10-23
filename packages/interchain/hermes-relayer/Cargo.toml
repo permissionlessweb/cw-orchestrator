@@ -1,0 +1,26 @@
+[package]
+authors.workspace = true
+description = "Hermes channel creation and packet relay for cw-orchestrator"
+edition.workspace = true
+license.workspace = true
+name = "cw-orch-hermes-relayer"
+repository.workspace = true
+version = "0.1.0"
+
+[dependencies]
+cw-orch-core = { workspace = true }
+cw-orch-daemon = { workspace = true }
+cw-orch-interchain-core = { workspace = true }
+cw-orch-interchain-daemon = { workspace = true }
+
+anyhow = { workspace = true }
+cosmrs = { workspace = true }
+cosmwasm-std = { workspace = true }
+futures = "0.3.30"
+hdpath = "0.6.3"
+ibc-relayer = { workspace = true }
+ibc-relayer-cli = { workspace = true }
+ibc-relayer-types = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }

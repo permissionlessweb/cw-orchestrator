@@ -17,6 +17,8 @@ pub mod prelude {
     pub use cw_orch_interchain_daemon::{
         ChannelCreationValidator, ChannelCreator, DaemonInterchain,
     };
+    #[cfg(feature = "hermes")]
+    pub use cw_orch_hermes_relayer::HermesRelayer;
     #[cfg(feature = "starship")]
     pub use cw_orch_starship::Starship;
 }
@@ -35,6 +37,8 @@ pub mod mock {
 #[cfg(feature = "daemon")]
 pub mod daemon {
     pub use cw_orch_interchain_daemon::*;
+    #[cfg(feature = "hermes")]
+    pub use cw_orch_hermes_relayer::HermesRelayer;
 }
 
 #[cfg(not(target_arch = "wasm32"))]

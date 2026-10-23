@@ -89,6 +89,9 @@ impl Wallet {
                 options.hd_index.unwrap_or(0),
                 chain_info.network_info.coin_type,
             )?,
+            CosmosWalletKey::Secp256k1(secret) => {
+                PrivateKey::from_secp256k1_secret(&secp, secret, chain_info.network_info.coin_type)?
+            }
         };
 
         // ensure address is valid
@@ -427,6 +430,14 @@ impl Signer for Wallet {
 
     fn chain_id(&self) -> String {
         self.chain_info.chain_id.clone()
+    }
+
+    fn rpc_urls(&self) -> Vec<String> {
+        self.chain_info.rpc_urls.clone()
+    }
+
+    fn lcd_url(&self) -> Option<String> {
+        self.chain_info.lcd_url.clone()
     }
 
     fn signer_info(&self, sequence: u64) -> SignerInfo {

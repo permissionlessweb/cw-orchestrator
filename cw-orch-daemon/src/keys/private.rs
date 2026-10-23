@@ -96,6 +96,35 @@ impl PrivateKey {
         Self::gen_private_key_raw(secp, raw_key, account, index, coin_type)
     }
 
+    /// Install an already-derived secp256k1 secret. Does not treat the bytes as an HD seed.
+    ///
+    /// [`Self::from_raw_key`] runs BIP32 `m/44'/coin'/account'/0/index` on the input.
+    /// A Cosmos keyring export (`terpd keys export --unarmored-hex`) is the child key,
+    /// so feeding it to `from_raw_key` produces a different address.
+    pub fn from_secp256k1_secret<C: secp256k1::Signing + secp256k1::Context>(
+        _secp: &Secp256k1<C>,
+        secret: &[u8],
+        coin_type: u32,
+    ) -> Result<PrivateKey, DaemonError> {
+        let private_key = secp256k1::SecretKey::from_slice(secret)?;
+        let xpriv = Xpriv {
+            network: bitcoin::NetworkKind::Main,
+            depth: 0,
+            parent_fingerprint: bitcoin::bip32::Fingerprint::default(),
+            child_number: bitcoin::bip32::ChildNumber::Normal { index: 0 },
+            private_key,
+            chain_code: [0u8; 32].into(),
+        };
+        Ok(PrivateKey {
+            account: 0,
+            index: 0,
+            coin_type,
+            mnemonic: None,
+            root_private_key: xpriv,
+            private_key: xpriv,
+        })
+    }
+
     /// generate the public key for this private key
     pub fn public_key<C: secp256k1::Signing + secp256k1::Context>(
         &self,
@@ -275,6 +304,24 @@ mod tst {
 
         Ok(())
     }
+
+    #[test]
+    pub fn secp_secret_is_not_hd_derived() -> StdResult<()> {
+        let phrase = "wonder caution square unveil april art add hover spend smile proud admit modify old copper throw crew happy nature luggage reopen exhibit ordinary napkin";
+        let secp = Secp256k1::new();
+        let derived = PrivateKey::from_words(&secp, phrase, 0, 0, 118)?;
+        let secret = derived.raw_key();
+        let direct = PrivateKey::from_secp256k1_secret(&secp, &secret, 118)?;
+        assert_eq!(direct.raw_key(), secret);
+        assert_eq!(
+            direct.public_key(&secp).account("terp")?,
+            derived.public_key(&secp).account("terp")?
+        );
+        let hd = PrivateKey::from_raw_key(&secp, &secret, 0, 0, 118)?;
+        assert_ne!(hd.raw_key(), secret);
+        Ok(())
+    }
+
     #[test]
     pub fn tst_words_to_pub() -> StdResult<()> {
         let str_1 = "wonder caution square unveil april art add hover spend smile proud admit modify old copper throw crew happy nature luggage reopen exhibit ordinary napkin";

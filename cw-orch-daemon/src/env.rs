@@ -34,11 +34,12 @@ pub struct DaemonEnvVars {}
 impl DaemonEnvVars {
     /// Optional - Path
     /// This is the path to the state file
-    /// `folder/file.json` will resolve to `~/.cw-orchestrator/folder/file.json`
+    /// `folder/file.json` will resolve to `~/.cw-orch/folder/file.json`
     /// `./folder/file.json` will resolve `$pwd/folder/file.json`
     /// `../folder/file.json` will resolve `$pwd/../folder/file.json`
     /// `/usr/var/file.json` will resolve to `/usr/var/file.json`
-    /// Defaults to "~./cw-orchestrator/state.json"
+    /// Defaults to `~/.cw-orch/state.json`. That home file is the public state.
+    /// `~/.cw-orchestrator/networks.toml` is unchanged.
     pub fn state_file() -> PathBuf {
         let state_file_string = env::var(STATE_FILE_ENV_NAME).unwrap_or("state.json".to_string());
         parse_with_log(state_file_string, STATE_FILE_ENV_NAME)
@@ -152,13 +153,22 @@ impl DaemonEnvVars {
 /// This function should only error if the home_dir is not set and the `dirs` library is unable to fetch it
 /// This happens only in rare cases
 pub fn default_state_folder() -> Result<PathBuf, StdError> {
-    dirs::home_dir().map(|home| home.join(".cw-orchestrator"))
+    dirs::home_dir().map(|home| home.join(".cw-orch"))
         .ok_or( StdError::msg(
             format!(
                 "Your machine doesn't have a home folder. You can't use relative path for the state file such as 'state.json'. 
                 Please use an absolute path ('/home/root/state.json') or a dot-prefixed-relative path ('./state.json') in the {} env variable.",
                 STATE_FILE_ENV_NAME
             )))
+}
+
+/// Directory for `networks.toml` only. State lives in [`default_state_folder`].
+pub fn default_networks_folder() -> Result<PathBuf, StdError> {
+    dirs::home_dir()
+        .map(|home| home.join(".cw-orchestrator"))
+        .ok_or(StdError::msg(
+            "Your machine doesn't have a home folder, so ~/.cw-orchestrator/networks.toml cannot be read.",
+        ))
 }
 
 fn parse_with_log<F: FromStr<Err = E>, E: std::fmt::Display>(

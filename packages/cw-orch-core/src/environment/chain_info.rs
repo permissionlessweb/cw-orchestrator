@@ -21,6 +21,8 @@ pub struct ChainInfoBase<StringType: Into<String> + Default, StringArrayType: As
     pub gas_price: f64,
     /// gRPC urls, used to attempt connection
     pub grpc_urls: StringArrayType,
+    /// CometBFT RPC urls. Used when a gRPC broadcast or simulate fails.
+    pub rpc_urls: StringArrayType,
     /// Optional urls for custom functionality
     pub lcd_url: Option<StringType>,
     /// Optional urls for custom functionality
@@ -63,6 +65,7 @@ impl<StringType: Into<String> + Default, StringArrayType: AsRef<[StringType]> + 
             gas_denom: Default::default(),
             gas_price: f64::NAN,
             grpc_urls: Default::default(),
+            rpc_urls: Default::default(),
             lcd_url: Default::default(),
             fcd_url: Default::default(),
             network_info: Default::default(),
@@ -78,6 +81,7 @@ impl From<ChainInfo> for ChainInfoOwned {
             gas_denom: value.gas_denom.to_string(),
             gas_price: value.gas_price,
             grpc_urls: value.grpc_urls.iter().map(|url| url.to_string()).collect(),
+            rpc_urls: value.rpc_urls.iter().map(|url| url.to_string()).collect(),
             lcd_url: value.lcd_url.map(ToString::to_string),
             fcd_url: value.fcd_url.map(ToString::to_string),
             network_info: value.network_info.into(),
@@ -151,6 +155,7 @@ impl ChainInfoOwned {
             gas_denom,
             gas_price,
             grpc_urls,
+            rpc_urls,
             lcd_url,
             fcd_url,
             network_info:
@@ -173,6 +178,9 @@ impl ChainInfoOwned {
         }
         if !grpc_urls.is_empty() {
             self.grpc_urls = grpc_urls;
+        }
+        if !rpc_urls.is_empty() {
+            self.rpc_urls = rpc_urls;
         }
         if let Some(lcd_url) = lcd_url {
             self.lcd_url = Some(lcd_url);

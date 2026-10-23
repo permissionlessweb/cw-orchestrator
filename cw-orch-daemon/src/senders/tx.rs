@@ -46,6 +46,16 @@ pub trait TxSender: QuerySender + Sync {
         self.commit_tx_any(msgs, memo)
     }
 
+    /// CometBFT RPC endpoints used when gRPC fails.
+    fn rpc_urls(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// LCD REST endpoint used when gRPC fails.
+    fn lcd_url(&self) -> Option<String> {
+        None
+    }
+
     /// Transaction broadcasting for Tendermint Transactions
     fn broadcast_tx(
         &self,
@@ -54,16 +64,34 @@ pub trait TxSender: QuerySender + Sync {
         Output = Result<cosmrs::proto::cosmos::base::abci::v1beta1::TxResponse, DaemonError>,
     > + Send {
         async move {
-            let mut client = cosmos_modules::tx::service_client::ServiceClient::new(self.channel());
-            let commit = client
-                .broadcast_tx(cosmos_modules::tx::BroadcastTxRequest {
-                    tx_bytes: tx.to_bytes()?,
-                    mode: cosmos_modules::tx::BroadcastMode::Sync.into(),
-                })
-                .await?;
-
-            let commit = commit.into_inner().tx_response.unwrap();
-            Ok(commit)
+            let tx_bytes = tx.to_bytes()?;
+            let grpc = async {
+                let mut client = crate::channel::tx_service(self.channel());
+                let commit = client
+                    .broadcast_tx(cosmos_modules::tx::BroadcastTxRequest {
+                        tx_bytes: tx_bytes.clone(),
+                        mode: cosmos_modules::tx::BroadcastMode::Sync.into(),
+                    })
+                    .await?;
+                let commit = commit
+                    .into_inner()
+                    .tx_response
+                    .ok_or_else(|| DaemonError::StdErr("grpc broadcast returned no response".into()))?;
+                Ok(commit)
+            };
+            match grpc.await {
+                Ok(response) => Ok(response),
+                Err(err) if crate::http_broadcast::is_transport_error(&err) => {
+                    crate::http_broadcast::broadcast(
+                        &tx_bytes,
+                        &self.rpc_urls(),
+                        self.lcd_url().as_deref(),
+                        &err,
+                    )
+                    .await
+                }
+                Err(err) => Err(err),
+            }
         }
     }
 

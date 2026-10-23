@@ -30,7 +30,7 @@ use std::collections::HashMap;
 /// This struct is safe to be sent between threads
 /// In contrary to InterchainStructure that holds Daemon in its definition which is not sendable
 #[derive(Default, Clone)]
-pub(crate) struct PacketInspector {
+pub struct PacketInspector {
     registered_chains: HashMap<NetworkId, Channel>,
 }
 
@@ -410,6 +410,7 @@ impl PacketInspector {
     }
 
     // From is the channel from which the send packet has been sent
+    /// Last send transaction for this packet sequence.
     pub async fn get_packet_send_tx(
         &self,
         from: ChainId<'_>,
@@ -437,6 +438,7 @@ impl PacketInspector {
     }
 
     // on is the chain on which the packet will be received
+    /// Receive transaction for this packet sequence on the counterparty.
     pub async fn get_packet_receive_tx(
         &self,
         from: ChainId<'_>,
@@ -464,6 +466,7 @@ impl PacketInspector {
     }
 
     // on is the chain on which the packet will be received
+    /// Timeout transaction for this packet sequence.
     pub async fn get_packet_timeout_tx(
         &self,
         from: ChainId<'_>,
@@ -491,6 +494,7 @@ impl PacketInspector {
     }
 
     // From is the channel from which the original send packet has been sent
+    /// Acknowledgement transaction for this packet sequence.
     pub async fn get_packet_ack_receive_tx(
         &self,
         from: ChainId<'_>,

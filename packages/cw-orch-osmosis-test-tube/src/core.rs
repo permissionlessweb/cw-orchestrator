@@ -39,6 +39,7 @@ pub const MOCK_CHAIN_INFO: ChainInfo = ChainInfo {
     gas_denom: "uosmo",
     gas_price: 0.0,
     grpc_urls: &[],
+    rpc_urls: &[],
     lcd_url: None,
     fcd_url: None,
     network_info: NetworkInfo {

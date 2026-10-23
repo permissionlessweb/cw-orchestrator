@@ -212,8 +212,7 @@ impl Node {
 
     /// Simulate TX
     pub async fn _simulate_tx(&self, tx_bytes: Vec<u8>) -> Result<u64, DaemonError> {
-        let mut client =
-            cosmos_modules::tx::service_client::ServiceClient::new(self.channel.clone());
+        let mut client = crate::channel::tx_service(self.channel.clone());
         #[allow(deprecated)]
         let resp: SimulateResponse = client
             .simulate(cosmos_modules::tx::SimulateRequest { tx: None, tx_bytes })
@@ -242,8 +241,7 @@ impl Node {
         hash: String,
         retries: usize,
     ) -> Result<CosmTxResponse, DaemonError> {
-        let mut client =
-            cosmos_modules::tx::service_client::ServiceClient::new(self.channel.clone());
+        let mut client = crate::channel::tx_service(self.channel.clone());
 
         let request = cosmos_modules::tx::GetTxRequest { hash: hash.clone() };
         let mut block_speed = self._average_block_speed(Some(0.7)).await?;
@@ -326,9 +324,7 @@ impl Node {
         retry_on_empty: bool,
         retries: usize,
     ) -> Result<Vec<CosmTxResponse>, DaemonError> {
-        let mut client = cosmrs::proto::cosmos::tx::v1beta1::service_client::ServiceClient::new(
-            self.channel.clone(),
-        );
+        let mut client = crate::channel::tx_service(self.channel.clone());
 
         #[allow(deprecated)]
         let request = cosmrs::proto::cosmos::tx::v1beta1::GetTxsEventRequest {

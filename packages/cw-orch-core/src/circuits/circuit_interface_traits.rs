@@ -10,10 +10,9 @@ use crate::{
     environment::{AccessConfig, ChainInfoOwned, ChainState, TxHandler, TxResponse, ZkTxHandler},
     error::CwEnvError,
 };
-use halo2_proofs::COSMWASM_FOOTER_LENGTH;
 use std::path::{Path, PathBuf};
 use zk_cosmwasm::curves::CurveType;
-use zk_cosmwasm::{CircuitFooter, CircuitType};
+use zk_cosmwasm::{CircuitFooter, CircuitType, COSMWASM_FOOTER_LENGTH};
 
 use super::circuit_instance::Circuit;
 
@@ -165,7 +164,7 @@ use serde::{Deserialize, Serialize};
 /// 3. No keys found → needs key generation
 ///
 /// Footer wire format is the monorepo zk CosmWasm v2 footer:
-/// [`halo2_proofs::COSMWASM_FOOTER_LENGTH`] bytes with `param_len` / `cs_len` / `vk_len`
+/// [`zk_cosmwasm::COSMWASM_FOOTER_LENGTH`] bytes with `param_len` / `cs_len` / `vk_len`
 /// (see `zk_cosmwasm::CircuitFooter`). CS presence is `cs_len > 0` (no flag bits).
 pub trait CircuitPathValidator: CircuitUploadable {
     /// Validate the circuit path and return detailed status

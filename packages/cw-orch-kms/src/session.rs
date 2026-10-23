@@ -210,7 +210,29 @@ impl ScriptSession {
         if ttl_secs == 0 {
             return Err("session refused: ttl is 0".into());
         }
-        let key = SigningKey::random();
+        Self::open_with_key(allowlist, factor, ttl_secs, clock, session_id, SigningKey::random())
+    }
+
+    /// Same session as [`open`](Self::open), on a key the caller already holds.
+    ///
+    /// A fresh key on every `open` cannot match a grant from an earlier run.
+    /// The caller keeps this key for the session duration and does not write
+    /// it to disk here.
+    pub fn open_with_key(
+        allowlist: RunAllowlist,
+        factor: ApprovalFactor,
+        ttl_secs: u64,
+        clock: &impl Clock,
+        session_id: impl Into<String>,
+        key: SigningKey,
+    ) -> Result<Self, String> {
+        let session_id = session_id.into();
+        if session_id.is_empty() {
+            return Err("session refused: empty session id".into());
+        }
+        if ttl_secs == 0 {
+            return Err("session refused: ttl is 0".into());
+        }
         let grantee = key
             .public_key()
             .account_id("terp")
@@ -341,5 +363,43 @@ mod tests {
         let err = session.authorize_use(&clock).unwrap_err();
         assert!(err.contains("session expired"));
         assert!(err.contains("run-3"));
+    }
+
+    #[test]
+    fn the_same_key_is_the_same_ephemeral_wallet() {
+        let key = SigningKey::from_slice(&[1u8; 32]).unwrap();
+        let again = SigningKey::from_slice(&[1u8; 32]).unwrap();
+        let clock = FixedClock { now: 1_000 };
+        let first = ScriptSession::open_with_key(
+            RunAllowlist::default(),
+            ApprovalFactor::Zafu,
+            60,
+            &clock,
+            "run-a",
+            key,
+        )
+        .unwrap();
+        let second = ScriptSession::open_with_key(
+            RunAllowlist::default(),
+            ApprovalFactor::Zafu,
+            60,
+            &clock,
+            "run-b",
+            again,
+        )
+        .unwrap();
+        assert_eq!(first.grantee(), second.grantee());
+        assert!(first.grantee().starts_with("terp1"));
+        assert!(format!("{:?}", first).contains("[REDACTED]"));
+        assert!(ScriptSession::open_with_key(
+            RunAllowlist::default(),
+            ApprovalFactor::Zafu,
+            0,
+            &clock,
+            "run-c",
+            SigningKey::from_slice(&[1u8; 32]).unwrap(),
+        )
+        .unwrap_err()
+        .contains("ttl is 0"));
     }
 }

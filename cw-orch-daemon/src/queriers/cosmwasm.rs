@@ -6,7 +6,7 @@ use crate::{cosmos_modules, error::DaemonError, DaemonBase};
 use cosmrs::proto::cosmos::base::query::v1beta1::PageRequest;
 use cosmrs::AccountId;
 use cosmwasm_std::{
-    from_json, instantiate2_address, to_json_binary, Addr, Checksum, CodeInfoResponse,
+    from_json, instantiate2_address, to_json_binary, Addr, Binary, Checksum, CodeInfoResponse,
     ContractInfoResponse,
 };
 use cw_orch_core::environment::Environment;
@@ -364,10 +364,12 @@ pub fn cosmrs_to_cosmwasm_code_info(
 pub fn cosmrs_to_cosmwasm_circuit_info(
     c: cosmrs::proto::cosmwasm::wasm::v1::CircuitInfoResponse,
 ) -> cosmwasm_std::CircuitInfoResponse {
-    let checksum: [u8; 32] = c.data_hash.try_into().unwrap();
+    // Proto still ships `data_hash` (32). Guest `CircuitInfoResponse` stores
+    // wasmvm `circuit_key` as Binary (typically 72). Pass hash bytes as Binary
+    // until the proto field is renamed/widened.
     cosmwasm_std::CircuitInfoResponse::new(
         c.zk_id,
         Addr::unchecked(c.creator),
-        Checksum::from(checksum),
+        Binary::from(c.data_hash),
     )
 }

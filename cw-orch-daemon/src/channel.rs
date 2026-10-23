@@ -7,8 +7,20 @@ use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
 use super::error::DaemonError;
 
+/// Send and receive cap for tx simulation, broadcast, and tx queries.
+/// A store of `dao_calendar.wasm` is larger than tonic's 4MB default.
+pub const GRPC_MAX_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
+
 /// A helper for constructing a gRPC channel
 pub struct GrpcChannel {}
+
+pub(crate) fn tx_service(
+    channel: Channel,
+) -> crate::cosmos_modules::tx::service_client::ServiceClient<Channel> {
+    crate::cosmos_modules::tx::service_client::ServiceClient::new(channel)
+        .max_decoding_message_size(GRPC_MAX_MESSAGE_BYTES)
+        .max_encoding_message_size(GRPC_MAX_MESSAGE_BYTES)
+}
 
 impl GrpcChannel {
     /// Connect to any of the provided gRPC endpoints
@@ -24,16 +36,18 @@ impl GrpcChannel {
 
             let uri = Uri::from_maybe_shared(address.clone()).expect("Invalid URI");
 
-            let maybe_channel = Endpoint::from(uri.clone())
-                .tls_config(
-                    ClientTlsConfig::new()
-                        .with_enabled_roots()
-                        // grpcs are http/2 by spec
-                        .assume_http2(true),
-                )
-                .unwrap()
-                .connect()
-                .await;
+            let mut endpoint = Endpoint::from(uri.clone());
+            // Plain http:// (LAN sentries, local nodes) must not force TLS.
+            if uri.scheme_str() == Some("https") {
+                endpoint = endpoint
+                    .tls_config(
+                        ClientTlsConfig::new()
+                            .with_enabled_roots()
+                            .assume_http2(true),
+                    )
+                    .unwrap();
+            }
+            let maybe_channel = endpoint.connect().await;
 
             if maybe_channel.is_err() {
                 log::warn!(

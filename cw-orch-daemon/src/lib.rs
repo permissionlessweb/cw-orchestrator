@@ -16,6 +16,7 @@ pub mod tx_broadcaster;
 pub mod tx_builder;
 
 mod builder;
+mod http_broadcast;
 mod channel;
 mod core;
 mod error;

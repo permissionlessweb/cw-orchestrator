@@ -18,6 +18,7 @@ pub const ICS_TESTNET: ChainInfo = ChainInfo {
     gas_denom: "uatom",
     gas_price: 0.01,
     grpc_urls: &["https://grpc-rs.cosmos.nodestake.top:443"],
+    rpc_urls: &[],
     network_info: COSMOS_HUB_NETWORK,
     lcd_url: Some("https://api-rs.cosmos.nodestake.top:443"),
     fcd_url: None,
