@@ -99,6 +99,8 @@ tonic       = { version = "0.14.1", features = ["codegen"] }
 
 # Logging
 log = "0.4.22"
+# 4.1.0 is breaking
+ed25519-zebra = "=4.0.3"
 
 # Interchain / Hermes relayer
 ibc-chain-registry = { package = "ibc-chain-registry", version = "0.32.2" }

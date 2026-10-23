@@ -35,7 +35,6 @@ use cw_orch_core::{
     environment::{AccessConfig, ChainInfoOwned, ChainKind},
     CoreEnvVars, CwEnvError,
 };
-
 #[cfg(feature = "eth")]
 use crate::proto::injective::InjectiveSigner;
 
@@ -243,7 +242,7 @@ impl Wallet {
     }
 
     pub async fn base_account(&self) -> Result<BaseAccount, DaemonError> {
-        let addr = self.address().to_string();
+        let addr = self.signer_account_id().to_string();
 
         let mut client = cosmos_modules::auth::query_client::QueryClient::new(self.channel());
 
@@ -306,7 +305,7 @@ impl Wallet {
 
         // If there is not enough asset balance, we need to warn the user
         log::info!(
-            "Not enough funds on chain {} at address {} to deploy the contract. 
+            "Not enough funds on chain {} at address {} to deploy the contract.
                 Needed: {}{} but only have: {}.
                 Press 'y' when the wallet balance has been increased to resume deployment",
             chain_info.chain_id,
@@ -475,6 +474,13 @@ impl Signer for Wallet {
     }
 
     fn account_id(&self) -> AccountId {
+        match self.authz_granter() {
+            Some(granter_addr) => AccountId::from_str(granter_addr.as_str()).unwrap(),
+            None => self.signer_account_id(),
+        }
+    }
+
+    fn signer_account_id(&self) -> AccountId {
         AccountId::new(
             &self.chain_info.network_info.pub_address_prefix,
             &self.private_key.public_key(&self.secp).raw_address.unwrap(),
