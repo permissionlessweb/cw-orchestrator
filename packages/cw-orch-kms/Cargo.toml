@@ -27,7 +27,7 @@ tonic = { workspace = true }
 tonic-prost = "=0.14.5"
 http = "1"
 chrono = "0.4"
-osst = { path = "../../../zeratul/crates/osst", default-features = false, features = ["secp256k1"] }
+osst = { version = "0.1.1", default-features = false, features = ["secp256k1"] }
 prost = { workspace = true }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 # Zigner multi-frame QR (qr_reader_phone / qrcode_rtx use raptorq 1.8).
