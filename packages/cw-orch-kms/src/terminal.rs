@@ -164,8 +164,10 @@ pub async fn listen(
     let bound = listener
         .local_addr()
         .map_err(|err| format!("terminal addr refused: {err}"))?;
+    let chain_id = approval_chain_id()?;
     let approval = approval_token();
     let sign_doc = approval_sign_bytes(
+        &chain_id,
         view.digest.as_str(),
         view.principal.as_str(),
         &approval,
@@ -180,7 +182,7 @@ pub async fn listen(
         sign_doc,
         None,
         0,
-        "Each block is one action. Scan the code below with Zigner on the Terp key, account 0. Then scan the phone here. The Zafu extension is not required.",
+        &format!("Each block is one action. Scan the code below with Zigner on the {} key, account 0. Then scan the phone here. The Zafu extension is not required.", crate::chain::approval_chain().display_name),
     )
 }
 
@@ -217,10 +219,10 @@ pub async fn listen_sign_doc(
         sign_doc.clone(),
         Some(sign_doc),
         account_index,
-        if granter == "key" {
-            "Sign this line with the airgapped Terp key. That key is the granter. The address is not chosen before the signature."
+        &if granter == "key" {
+            format!("Sign this line with the airgapped {} key. That key is the granter. The address is not chosen before the signature.", crate::chain::approval_chain().display_name)
         } else {
-            "Each block is one message in the session grant. Scan the code with Zigner on the Terp key. The script broadcasts the signed grant, then the session key uploads."
+            format!("Each block is one message in the session grant. Scan the code with Zigner on the {} key. The script broadcasts the signed grant, then the session key uploads.", crate::chain::approval_chain().display_name)
         },
     )
 }
@@ -244,6 +246,9 @@ pub async fn capture_granter(
     account_index: u32,
     binding: &str,
 ) -> Result<String, String> {
+    if binding.trim().is_empty() {
+        return Err("granter refused: empty binding".into());
+    }
     let doc = format!("cw-orch-granter:v1\n{binding}").into_bytes();
     let messages = vec![SigningRequest::new("cw-orch-granter:v1").body(format!(
         "the key that signs {binding} is the granter"
@@ -252,7 +257,10 @@ pub async fn capture_granter(
     let outcome = terminal.outcome().await?;
     drop(terminal);
     match outcome {
-        TerminalOutcome::Signed { signer, .. } => Ok(signer),
+        TerminalOutcome::Signed { signer, .. } => {
+            crate::policy::validate_chain_address(&signer).map_err(|e| format!("granter refused: {e}"))?;
+            Ok(signer)
+        }
         TerminalOutcome::Approved { .. } => {
             Err("granter refused: the page returned an off-chain approval".into())
         }
@@ -453,18 +461,30 @@ fn session_page(
         let sign = !bundle.sign_doc.is_empty();
         let digest = hex_encode(sha2::Sha256::digest(bundle.sign_doc.as_slice()).as_slice());
         let doc = hex_encode(bundle.sign_doc.as_slice());
-        let qr = if sign {
-            qr_svg(&zigner_request(account_index, "terp", &bundle.sign_doc))
+        let frames = if sign {
+            zigner_frames(&zigner_request(account_index, &crate::chain::approval_chain().zigner_chain_name, &bundle.sign_doc))?
         } else {
-            String::new()
+            Vec::new()
+        };
+        let qr = match frames.as_slice() {
+            [] => String::new(),
+            [one] => qr_svg(one),
+            many => frame_svg(&many[0]),
+        };
+        let (frames_svg, frames_hex): (Vec<String>, Vec<String>) = if frames.len() > 1 {
+            frames.iter().map(|f| (frame_svg(f), hex_encode(f))).unzip()
+        } else {
+            (Vec::new(), Vec::new())
         };
         json.push_str(&format!(
-            "{{\"sign\":{sign},\"title\":{title},\"digest\":{digest},\"doc\":{doc},\"qr\":{qr},\"actions\":{actions}}}",
+            "{{\"sign\":{sign},\"title\":{title},\"digest\":{digest},\"doc\":{doc},\"qr\":{qr},\"frames\":{frames},\"frames_hex\":{frames_hex},\"actions\":{actions}}}",
             sign = if sign { "true" } else { "false" },
             title = json_string(&bundle.title),
             digest = json_string(&digest),
             doc = json_string(&doc),
             qr = json_string(&qr),
+            frames = json_list(&frames_svg),
+            frames_hex = json_list(&frames_hex),
             actions = actions_json(&bundle.messages),
         ));
     }
@@ -481,7 +501,7 @@ fn session_page(
             )
             .as_slice(),
         ))?,
-        principal: Principal::new(granter).unwrap_or_else(|_| Principal::new("terp").expect("principal")),
+        principal: Principal::new(granter).unwrap_or_else(|_| Principal::new(crate::chain::approval_chain().bech32_prefix).expect("principal")),
         messages: Vec::new(),
     };
     let mut html = page(
@@ -503,8 +523,14 @@ fn page(
     account_index: u32,
     intro: &str,
 ) -> String {
-    let request = zigner_request(account_index, "terp", sign_doc);
-    let qr = qr_svg(&request);
+    let request = zigner_request(account_index, &crate::chain::approval_chain().zigner_chain_name, sign_doc);
+    let qr = match zigner_frames(&request) {
+        Ok(frames) if frames.len() > 1 => {
+            let svgs: Vec<String> = frames.iter().map(|f| frame_svg(f)).collect();
+            format!("{}<script type=\"application/json\" id=\"qr-frames\">{}</script>", svgs[0], json_list(&svgs))
+        }
+        _ => qr_svg(&request),
+    };
     format!(
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Zafu session</title>\
 <style>\
@@ -554,6 +580,7 @@ summary{{cursor:pointer;color:var(--dim);font-size:13px}}
 <p class=\"lede\" id=\"approval\">{approval}</p>\
 <div class=\"row\"><span class=\"chip\" id=\"principal\">{principal}</span></div>\
 <p class=\"meta\" id=\"digest\">{digest}</p>\
+<script type=\"application/json\" id=\"chain\">{chain_json}</script>\
 <p class=\"lede\">{intro}</p>\
 <div id=\"tabs\"></div>\
 <p class=\"lede\" id=\"step-guide\"></p>\
@@ -578,6 +605,7 @@ summary{{cursor:pointer;color:var(--dim);font-size:13px}}
 <script src=\"/zxing/index.min.js\"></script>\
 {script}</body></html>",
         digest = escape(view.digest.as_str()),
+        chain_json = json_string(&approval_chain_id().unwrap_or_default()).replace('<', "\\u003c"),
         principal = escape(view.principal.as_str()),
         approval = escape(approval),
         cards = action_cards(&view.messages),
@@ -627,11 +655,96 @@ pub(crate) fn zigner_request(account_index: u32, chain_name: &str, sign_doc: &[u
             .to_le_bytes()),
     );
     payload.extend_from_slice(sign_doc);
+    // Non-Terp chains carry Zigner's QR extension so the phone derives the
+    // right prefix and coin type: address_idx u32 LE (0), then 0xC5, version
+    // 0x01, flags (bit0 coin_type u32 LE, bit1 prefix len + prefix).
+    // Terp payloads stay byte-identical to the legacy layout.
+    let chain = crate::chain::approval_chain();
+    if chain.bech32_prefix != "terp" && chain.bech32_prefix.len() <= 83 {
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&[0xC5, 0x01, 0b11]);
+        payload.extend_from_slice(&chain.coin_type.to_le_bytes());
+        payload.push(chain.bech32_prefix.len() as u8);
+        payload.extend_from_slice(chain.bech32_prefix.as_bytes());
+    }
     payload
+}
+
+/// Hex of the Zigner QR the page shows for `sign_doc` on the approval chain.
+pub fn zigner_qr_hex(account_index: u32, sign_doc: &[u8]) -> String {
+    let chain = crate::chain::approval_chain();
+    zigner_request(account_index, &chain.zigner_chain_name, sign_doc)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 pub(crate) fn zigner_request_fits(account_index: u32, chain_name: &str, sign_doc: &[u8]) -> bool {
     qrcode::QrCode::new(zigner_request(account_index, chain_name, sign_doc)).is_ok()
+}
+
+/// Raptorq symbol size per animated frame. A 1000-byte symbol plus the 8-byte
+/// header fits a version-24 code at ECC L.
+pub const ZIGNER_FRAME_BYTES: u16 = 1000;
+/// Byte-mode capacity of a version-40 code at ECC L (Zigner's own limit).
+const QR_MAX_BYTES: usize = 2953;
+
+/// `CW_ORCH_KMS_QR_FRAME_BYTES=<n>` forces animated frames of `n` bytes even
+/// when the request fits one code (rehearsal / phone testing).
+fn forced_frame_bytes() -> Option<u16> {
+    std::env::var("CW_ORCH_KMS_QR_FRAME_BYTES").ok().and_then(|v| v.trim().parse::<u16>().ok()).filter(|n| *n >= 64)
+}
+
+/// The codes the phone scans for one Zigner request. One plain code when it
+/// fits; otherwise Zigner's fountain frames (see [`raptor_frames`]).
+pub fn zigner_frames(request: &[u8]) -> Result<Vec<Vec<u8>>, String> {
+    match forced_frame_bytes() {
+        Some(n) => raptor_frames(request, n),
+        None if qrcode::QrCode::new(request).is_ok() => Ok(vec![request.to_vec()]),
+        None => raptor_frames(request, ZIGNER_FRAME_BYTES),
+    }
+}
+
+/// Zigner's multi-frame format, byte for byte as `qrcode_rtx::make_data_packs`
+/// writes it and `qr_reader_phone` reads it: each frame is a 4-byte big-endian
+/// header (top bit 1, low 31 bits = total payload length) followed by one
+/// serialized raptorq `EncodingPacket` (`Encoder::with_defaults(input, chunk)`,
+/// `len / chunk` repair packets). Any `ceil(len / chunk)` distinct frames decode.
+pub fn raptor_frames(input: &[u8], chunk: u16) -> Result<Vec<Vec<u8>>, String> {
+    if input.is_empty() {
+        return Err("qr refused: empty request".into());
+    }
+    if input.len() >= 0x8000_0000 || chunk == 0 {
+        return Err("qr refused: request too long".into());
+    }
+    let head = (input.len() as u32 + 0x8000_0000).to_be_bytes();
+    let repair = if input.len() as u32 <= chunk as u32 { 0 } else { input.len() as u32 / chunk as u32 };
+    let encoder = raptorq::Encoder::with_defaults(input, chunk);
+    let frames: Vec<Vec<u8>> = encoder
+        .get_encoded_packets(repair)
+        .iter()
+        .map(|packet| [head.to_vec(), packet.serialize()].concat())
+        .collect();
+    let len = frames.first().map(|f| f.len()).unwrap_or(0);
+    if frames.iter().any(|f| f.len() != len) {
+        return Err("qr refused: frames have different lengths".into());
+    }
+    if len > QR_MAX_BYTES {
+        return Err("qr refused: frame too large for one code".into());
+    }
+    Ok(frames)
+}
+
+fn frame_svg(data: &[u8]) -> String {
+    match qrcode::QrCode::with_error_correction_level(data, qrcode::EcLevel::L) {
+        Ok(code) => code.render::<qrcode::render::svg::Color<'_>>().min_dimensions(240, 240).build(),
+        Err(_) => "<p>this frame does not fit in one code.</p>".to_string(),
+    }
+}
+
+fn json_list(items: &[String]) -> String {
+    let parts: Vec<String> = items.iter().map(|item| json_string(item)).collect();
+    format!("[{}]", parts.join(",")).replace('<', "\\u003c")
 }
 
 fn qr_svg(data: &[u8]) -> String {
@@ -644,8 +757,23 @@ fn qr_svg(data: &[u8]) -> String {
 }
 
 const PAGE_SCRIPT: &str = r#"<script>
+var qrTimer = null;
+function animateQr(el, frames, single) {
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+  if (!el) return;
+  if (!frames || frames.length < 2) { el.innerHTML = single || ""; return; }
+  var at = 0;
+  var note = "<p class=\"foot\">animated code: " + frames.length + " frames. keep the phone on it until Zigner shows the request.</p>";
+  el.innerHTML = frames[0] + note;
+  qrTimer = setInterval(function () { at = (at + 1) % frames.length; el.innerHTML = frames[at] + note; }, 250);
+}
 (function () {
-  var chain = "terp-1";
+  var t = document.getElementById("qr-frames");
+  if (!t || document.getElementById("bundles")) return;
+  try { animateQr(document.getElementById("zigner-qr"), JSON.parse(t.textContent), ""); } catch (e) {}
+})();
+(function () {
+  var chain = JSON.parse(document.getElementById("chain").textContent);
   var digest = document.getElementById("digest").textContent;
   var principal = document.getElementById("principal").textContent;
   var approval = document.getElementById("approval").textContent;
@@ -1070,10 +1198,11 @@ const PAGE_SCRIPT: &str = r#"<script>
     if (pubkeyField && pubkeyField.parentElement) pubkeyField.parentElement.hidden = !signing;
     if (signatureField && signatureField.parentElement) signatureField.parentElement.hidden = !signing;
     if (bundle.sign) {
-      qr.innerHTML = bundle.qr || "";
+      animateQr(qr, bundle.frames, bundle.qr || "");
       if (scan) scan.hidden = !signing;
       if (check) check.hidden = !signing;
     } else {
+      animateQr(null);
       qr.innerHTML = "<p>the session key broadcasts this. the cold key does not sign it.</p>";
       if (scan) scan.hidden = true;
       if (check) check.hidden = true;
@@ -1375,8 +1504,14 @@ fn zafu_approval(
     else {
         return TerminalOutcome::Refused;
     };
-    let message = approval_sign_bytes(digest, principal, approval, messages);
+    let Ok(chain_id) = approval_chain_id() else {
+        return TerminalOutcome::Refused;
+    };
+    let message = approval_sign_bytes(&chain_id, digest, principal, approval, messages);
     if !address_matches(addr, &pk) || !verify_amino(&pk, &sig, &message) {
+        return TerminalOutcome::Refused;
+    }
+    if !crate::policy::principal_accepts(Some(principal), addr) {
         return TerminalOutcome::Refused;
     }
     TerminalOutcome::Approved {
@@ -1486,7 +1621,7 @@ fn check_signature(
     if sig.len() != 64 {
         return "refused the signature is not 64 bytes".to_string();
     }
-    let Some(addr) = terp_address(&pk) else {
+    let Some(addr) = chain_address(&pk) else {
         return "refused the pubkey is not a terp address".to_string();
     };
     // `key` means this signature chooses the granter. The address is the
@@ -1498,7 +1633,10 @@ fn check_signature(
     let message = if let Some(doc) = sign_doc {
         doc
     } else {
-        owned = approval_sign_bytes(digest, principal, approval, messages);
+        let Ok(chain_id) = approval_chain_id() else {
+            return "refused the approval chain-id is not configured".to_string();
+        };
+        owned = approval_sign_bytes(&chain_id, digest, principal, approval, messages);
         owned.as_slice()
     };
     if !verify_amino(&pk, &sig, message) {
@@ -1532,9 +1670,9 @@ fn hex_val(byte: u8) -> Option<u8> {
     }
 }
 
-fn terp_address(pk: &[u8]) -> Option<String> {
+fn chain_address(pk: &[u8]) -> Option<String> {
     let hash = ripemd::Ripemd160::digest(sha2::Sha256::digest(pk));
-    bech32::encode::<bech32::Bech32>(bech32::Hrp::parse("terp").ok()?, hash.as_slice()).ok()
+    crate::chain::approval_chain().address(hash.as_slice())
 }
 
 fn approval_token() -> String {
@@ -1576,14 +1714,40 @@ fn actions_json(messages: &[SigningRequest]) -> String {
     out
 }
 
+/// Chain-id bound into the approval sign doc. Set from the configured chain
+/// (session open or the v2 granter challenge), else `CW_ORCH_APPROVAL_CHAIN_ID`.
+/// There is no built-in default: an unset chain refuses the page.
+static APPROVAL_CHAIN_ID: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+pub fn set_approval_chain_id(chain_id: &str) -> Result<(), String> {
+    let trimmed = chain_id.trim();
+    if trimmed.is_empty() || trimmed.len() > 64 || !trimmed.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.') {
+        return Err(format!("approval refused: invalid chain-id {chain_id:?}"));
+    }
+    *APPROVAL_CHAIN_ID.write().map_err(|_| "approval refused: chain-id lock".to_string())? = Some(trimmed.to_string());
+    Ok(())
+}
+
+pub fn approval_chain_id() -> Result<String, String> {
+    if let Some(id) = APPROVAL_CHAIN_ID.read().ok().and_then(|g| g.clone()) {
+        return Ok(id);
+    }
+    match std::env::var("CW_ORCH_APPROVAL_CHAIN_ID") {
+        Ok(id) if !id.trim().is_empty() => Ok(id.trim().to_string()),
+        _ => Err("approval refused: chain-id is not configured (open the session on a configured chain or set CW_ORCH_APPROVAL_CHAIN_ID)".into()),
+    }
+}
+
 fn approval_sign_bytes(
+    chain_id: &str,
     digest: &str,
     principal: &str,
     approval: &str,
     messages: &[SigningRequest],
 ) -> Vec<u8> {
     let json = format!(
-        "{{\"account_number\":\"0\",\"chain_id\":\"terp-1\",\"fee\":{{\"amount\":[],\"gas\":\"0\"}},\"memo\":\"cw-orch-approval:v1\",\"msgs\":[{{\"type\":\"cw-orch/Approval\",\"value\":{{\"actions\":{actions},\"digest\":{digest},\"nonce\":{approval},\"principal\":{principal}}}}}],\"sequence\":\"0\"}}",
+        "{{\"account_number\":\"0\",\"chain_id\":{chain},\"fee\":{{\"amount\":[],\"gas\":\"0\"}},\"memo\":\"cw-orch-approval:v1\",\"msgs\":[{{\"type\":\"cw-orch/Approval\",\"value\":{{\"actions\":{actions},\"digest\":{digest},\"nonce\":{approval},\"principal\":{principal}}}}}],\"sequence\":\"0\"}}",
+        chain = json_string(chain_id),
         actions = actions_json(messages),
         digest = json_string(digest),
         approval = json_string(approval),
@@ -1618,7 +1782,7 @@ fn address_matches(addr: &str, pk: &[u8]) -> bool {
     let Ok((hrp, data)) = bech32::decode(addr) else {
         return false;
     };
-    if hrp.as_str() != "terp" {
+    if hrp.as_str() != crate::chain::approval_chain().bech32_prefix {
         return false;
     }
     let hash = ripemd::Ripemd160::digest(sha2::Sha256::digest(pk));
@@ -1649,6 +1813,94 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
+mod frame_tests {
+    use super::*;
+    use raptorq::{Decoder, EncodingPacket, ObjectTransmissionInformation};
+
+    /// Zigner's reader, as `qr_reader_phone::process_payload` decodes a fountain.
+    fn zigner_decode<'a>(frames: impl Iterator<Item = &'a Vec<u8>>) -> Option<Vec<u8>> {
+        let mut decoder: Option<(u32, Decoder)> = None;
+        for frame in frames {
+            assert!(frame[0] & 0x80 != 0, "fountain tag bit");
+            let size = u32::from_be_bytes([frame[0] & 0x7f, frame[1], frame[2], frame[3]]);
+            let packet = EncodingPacket::deserialize(&frame[4..]);
+            let d = decoder.get_or_insert_with(|| {
+                (size, Decoder::new(ObjectTransmissionInformation::with_defaults(size as u64, packet.data().len() as u16)))
+            });
+            assert_eq!(d.0, size);
+            if let Some(out) = d.1.decode(packet) {
+                return Some(out);
+            }
+        }
+        None
+    }
+
+    fn big_doc(n: usize) -> Vec<u8> {
+        let mut doc = String::from("{\"account_number\":\"1\",\"chain_id\":\"morocco-1\",\"memo\":\"");
+        let mut i = 0u64;
+        while doc.len() < n - 3 {
+            doc.push_str(&format!("{:x}", i.wrapping_mul(0x9e3779b97f4a7c15)));
+            i += 1;
+        }
+        doc.truncate(n - 2);
+        doc.push_str("\"}");
+        doc.into_bytes()
+    }
+
+    #[test]
+    fn a_15k_sign_doc_round_trips_through_zigner_frames() {
+        let doc = big_doc(15_000);
+        assert_eq!(doc.len(), 15_000);
+        let request = zigner_request(0, "terp", &doc);
+        assert!(qrcode::QrCode::new(&request).is_err(), "15 KB does not fit one code");
+        let frames = raptor_frames(&request, ZIGNER_FRAME_BYTES).unwrap();
+        let source = request.len().div_ceil(ZIGNER_FRAME_BYTES as usize);
+        let repair = request.len() / ZIGNER_FRAME_BYTES as usize;
+        assert_eq!(source, 16);
+        assert_eq!(frames.len(), source + repair);
+        assert_eq!(frames.len(), 31);
+        for f in &frames {
+            assert_eq!(f.len(), 4 + 4 + ZIGNER_FRAME_BYTES as usize);
+            assert!(qrcode::QrCode::with_error_correction_level(f, qrcode::EcLevel::L).is_ok());
+        }
+        assert_eq!(zigner_decode(frames.iter()).unwrap(), request);
+        // A phone that missed frames still decodes from the repair frames.
+        assert_eq!(zigner_decode(frames.iter().skip(5)).unwrap(), request);
+        assert_eq!(zigner_decode(frames.iter().rev()).unwrap(), request);
+        assert!(zigner_decode(frames.iter().take(source - 1)).is_none());
+    }
+
+    #[test]
+    fn a_small_request_stays_one_plain_code() {
+        let request = zigner_request(0, "terp", b"{\"a\":1}");
+        let frames = zigner_frames(&request).unwrap();
+        assert_eq!(frames, vec![request.clone()]);
+        assert_eq!(frames[0][..3], [0x53, 0x05, 0x10]);
+        let forced = raptor_frames(&request, 8).unwrap();
+        assert!(forced.len() > 1);
+        assert_eq!(zigner_decode(forced.iter()).unwrap(), request);
+    }
+
+    #[test]
+    fn the_session_page_animates_a_large_bundle() {
+        set_approval_chain_id("morocco-1").unwrap();
+        let bundles = vec![PageBundle { title: "big".into(), sign_doc: big_doc(15_000), messages: Vec::new() }];
+        let html = session_page(&bundles, "terp1denpf5rdle2rwgdl8n7n22n6d3cwzt844u2qtz", 0).unwrap();
+        let start = html.find("id=\"bundles\">").unwrap() + 13;
+        let end = start + html[start..].find("</script>").unwrap();
+        let v: serde_json::Value = serde_json::from_str(&html[start..end]).unwrap();
+        assert_eq!(v[0]["frames"].as_array().unwrap().len(), 31);
+        let hex_frames: Vec<Vec<u8>> = v[0]["frames_hex"].as_array().unwrap().iter()
+            .map(|h| (0..h.as_str().unwrap().len()).step_by(2).map(|i| u8::from_str_radix(&h.as_str().unwrap()[i..i + 2], 16).unwrap()).collect())
+            .collect();
+        let doc = big_doc(15_000);
+        let want = zigner_request(0, &crate::chain::approval_chain().zigner_chain_name, &doc);
+        assert_eq!(zigner_decode(hex_frames.iter()).unwrap(), want);
+        assert!(html.contains("animateQr(qr, bundle.frames"));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::allowlist::{Principal, SignDocDigest, SigningRequest, MSG_STORE_CODE};
@@ -1657,6 +1909,7 @@ mod tests {
     use tokio::net::TcpStream;
 
     fn view() -> ApprovalView {
+        set_approval_chain_id("morocco-1").unwrap();
         ApprovalView {
             digest: SignDocDigest::new("ab".repeat(32)).unwrap(),
             principal: Principal::new("treasury").unwrap(),
@@ -1807,11 +2060,22 @@ mod tests {
     }
 
     #[test]
+    fn approval_chain_id_is_configured_not_hardcoded() {
+        assert!(set_approval_chain_id("").is_err());
+        assert!(set_approval_chain_id("bad chain").is_err());
+        let a = approval_sign_bytes("morocco-1", "d", "p", "n", &[]);
+        let b = approval_sign_bytes("terp-1", "d", "p", "n", &[]);
+        assert_ne!(a, b);
+        assert!(!PAGE_SCRIPT.contains("terp-1"));
+    }
+
+    #[test]
     fn amino_preimage_sorts_keys_and_escapes() {
         let action = SigningRequest::new(MSG_STORE_CODE)
             .contract("a<b")
             .body("{\"wasm\":\"QQ==\"}");
         let bytes = approval_sign_bytes(
+            "morocco-1",
             &"ab".repeat(32),
             "a<b&c",
             &"cd".repeat(32),
@@ -1819,7 +2083,7 @@ mod tests {
         );
         let text = String::from_utf8(bytes).unwrap();
         let expected = format!(
-            "{{\"account_number\":\"0\",\"chain_id\":\"terp-1\",\"fee\":{{\"amount\":[],\"gas\":\"0\"}},\"memo\":\"cw-orch-approval:v1\",\"msgs\":[{{\"type\":\"cw-orch/Approval\",\"value\":{{\"actions\":[{{\"body\":\"{{\\\"wasm\\\":\\\"QQ==\\\"}}\",\"contract\":\"a\\u003cb\",\"type\":\"{url}\"}}],\"digest\":\"{}\",\"nonce\":\"{}\",\"principal\":\"a\\u003cb\\u0026c\"}}}}],\"sequence\":\"0\"}}",
+            "{{\"account_number\":\"0\",\"chain_id\":\"morocco-1\",\"fee\":{{\"amount\":[],\"gas\":\"0\"}},\"memo\":\"cw-orch-approval:v1\",\"msgs\":[{{\"type\":\"cw-orch/Approval\",\"value\":{{\"actions\":[{{\"body\":\"{{\\\"wasm\\\":\\\"QQ==\\\"}}\",\"contract\":\"a\\u003cb\",\"type\":\"{url}\"}}],\"digest\":\"{}\",\"nonce\":\"{}\",\"principal\":\"a\\u003cb\\u0026c\"}}}}],\"sequence\":\"0\"}}",
             "ab".repeat(32),
             "cd".repeat(32),
             url = MSG_STORE_CODE,
@@ -1959,7 +2223,9 @@ mod tests {
         use k256::ecdsa::signature::hazmat::PrehashSigner;
         let sk = k256::ecdsa::SigningKey::from_slice(&[7u8; 32]).unwrap();
         let pk = sk.verifying_key().to_encoded_point(true);
+        set_approval_chain_id("morocco-1").unwrap();
         let message = approval_sign_bytes(
+            "morocco-1",
             digest,
             principal,
             approval,
@@ -2142,4 +2408,25 @@ mod tests {
         let text = String::from_utf8_lossy(&buf[..n]);
         text.split_whitespace().nth(1).unwrap().parse().unwrap()
     }
+}
+
+/// Granter capture bound to purpose, chain-id, a fresh nonce and an expiry (v2 challenge).
+pub fn capture_granter_for_chain_sync(
+    addr: SocketAddr,
+    account_index: u32,
+    purpose: &str,
+    chain_id: &str,
+) -> Result<String, String> {
+    set_approval_chain_id(chain_id)?;
+    let challenge = crate::policy::GranterChallenge::new(
+        purpose,
+        chain_id,
+        crate::policy::MAX_CHALLENGE_TTL_SECS,
+        crate::policy::now_unix(),
+    )?;
+    let signer = capture_granter_sync(addr, account_index, &challenge.binding())?;
+    if crate::policy::now_unix() >= challenge.expires_unix {
+        return Err("granter refused: challenge expired before signing".into());
+    }
+    Ok(signer)
 }

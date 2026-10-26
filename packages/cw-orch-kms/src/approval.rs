@@ -72,6 +72,8 @@ pub struct ApprovalSession {
     /// grants the ephemeral key the right to revoke them, then that key
     /// broadcasts the revoke. No second cold signature.
     pub retain: bool,
+    /// Grant `MsgExec` (nested authz). See [`ApprovalSession::allow_nested_exec`].
+    pub nested_exec: bool,
 }
 
 impl ApprovalSession {
@@ -91,6 +93,18 @@ impl ApprovalSession {
         }
         self.push_type(MSG_STORE_CODE);
         Ok(self)
+    }
+
+    /// Let the session key send `MsgExec` as the granter, so it can relay a
+    /// grant the granter itself holds from another wallet:
+    /// `MsgExec(session key){MsgExec(granter){MsgExecuteContract(owner)}}`.
+    /// This is a GenericAuthorization on `MsgExec`: for the session's TTL the
+    /// session key can use every grant the granter holds. Keep the TTL short;
+    /// the default close revokes it. `allow_sdk` still refuses `MsgExec`.
+    pub fn allow_nested_exec(mut self) -> Self {
+        self.nested_exec = true;
+        self.push_type(crate::allowlist::MSG_AUTHZ_EXEC);
+        self
     }
 
     /// Instantiate is type-wide. The chain has no code-id authorization.
@@ -177,6 +191,7 @@ impl ApprovalSession {
             bind: "127.0.0.1:8741".parse().expect("loopback port"),
             account_index: 0,
             retain: false,
+            nested_exec: false,
         }
     }
 }
@@ -214,6 +229,10 @@ pub struct AuthzSession {
     grantee: String,
     type_urls: Vec<String>,
     page: Option<Terminal>,
+    /// Set once the revoke was broadcast (or the grant was retained). Drop
+    /// revokes when this is still false, so an early `?` or a panic between
+    /// `enable_session` and `close` does not leave the grant behind.
+    closed: bool,
 }
 
 impl AuthzSession {
@@ -228,6 +247,14 @@ impl AuthzSession {
         });
     }
 
+    pub fn granter(&self) -> &str {
+        &self.granter
+    }
+
+    pub fn grantee(&self) -> &str {
+        &self.grantee
+    }
+
     /// Keep the page up after [`Self::close`] so a later line can still land.
     pub fn detach_page(&mut self) -> Option<Terminal> {
         self.page.take()
@@ -235,41 +262,107 @@ impl AuthzSession {
 
     /// Revoke the session grant. The ephemeral key signs this. A retained
     /// session leaves the grant in place.
-    pub fn close(self) -> Result<(), String> {
-        let AuthzSession {
-            daemon,
-            retain,
-            granter,
-            grantee,
-            type_urls,
-            page,
-        } = self;
-        if retain {
-            if let Some(page) = &page {
+    pub fn close(mut self) -> Result<(), String> {
+        let result = self.revoke_now();
+        // Close was called: Drop must not retry, even after an error. The
+        // grant's expiration is the backstop when the revoke failed.
+        self.closed = true;
+        result
+    }
+
+    fn revoke_now(&mut self) -> Result<(), String> {
+        if self.retain {
+            if let Some(page) = &self.page {
                 page.note("ok session grant retained");
             }
             println!("session grant retained");
             return Ok(());
         }
-        let msgs = revoke_exec_anys(&granter, &grantee, &type_urls)?;
-        let handle = daemon.rt_handle.clone();
-        handle
-            .block_on(daemon.sender().commit_tx_any(msgs, Some("cw-orch session revoke")))
-            .map_err(|err| {
-                if let Some(page) = &page {
-                    page.note(&format!("err session revoke refused: {err}"));
-                }
-                format!("session revoke refused: {err}")
-            })?;
-        if let Some(page) = &page {
+        let msgs = revoke_exec_anys(&self.granter, &self.grantee, &self.type_urls)?;
+        let handle = self.daemon.rt_handle.clone();
+        let sender = self.daemon.sender();
+        let commit = handle.block_on(sender.commit_tx_any(msgs, Some("cw-orch session revoke")));
+        if let Err(err) = commit {
+            if let Some(page) = &self.page {
+                page.note(&format!("err session revoke refused: {err}"));
+            }
+            return Err(format!("session revoke refused: {err}"));
+        }
+        if let Some(page) = &self.page {
             page.note("ok session revoke broadcast");
-            let _ = daemon.rt_handle.block_on(async {
+            let _ = handle.block_on(async {
                 tokio::task::yield_now().await;
             });
         }
         println!("session revoke broadcast");
         Ok(())
     }
+
+    /// What the chain still stores for this granter and session key.
+    pub fn remaining_grants(&self) -> Result<GranteeState, String> {
+        let channel = self.daemon.sender().channel();
+        let (granter, grantee) = (self.granter.clone(), self.grantee.clone());
+        run_off_runtime(&self.daemon.rt_handle, async move {
+            grantee_state(channel, &granter, &grantee).await
+        })
+    }
+}
+
+impl Drop for AuthzSession {
+    fn drop(&mut self) {
+        if self.closed || self.retain {
+            return;
+        }
+        self.closed = true;
+        let why = if std::thread::panicking() { "panic" } else { "early return" };
+        eprintln!("session dropped without close ({why}): revoking the session grant");
+        let handle = self.daemon.rt_handle.clone();
+        let msgs = match revoke_exec_anys(&self.granter, &self.grantee, &self.type_urls) {
+            Ok(msgs) => msgs,
+            Err(err) => {
+                eprintln!("session revoke on drop refused: {err}; the grant expires on its own");
+                return;
+            }
+        };
+        let daemon = self.daemon.clone();
+        let result = run_off_runtime(&handle, async move {
+            daemon
+                .sender()
+                .commit_tx_any(msgs, Some("cw-orch session revoke (drop)"))
+                .await
+                .map(|_| ())
+                .map_err(|err| err.to_string())
+        });
+        match result {
+            Ok(()) => eprintln!("session revoke broadcast (drop)"),
+            Err(err) => eprintln!("session revoke on drop refused: {err}; the grant expires on its own"),
+        }
+    }
+}
+
+/// `block_on` panics on a runtime worker thread, so run on a scoped thread
+/// when this is called from inside the runtime (Drop can be).
+fn run_off_runtime<T: Send>(
+    handle: &tokio::runtime::Handle,
+    fut: impl std::future::Future<Output = Result<T, String>> + Send,
+) -> Result<T, String> {
+    if tokio::runtime::Handle::try_current().is_err() {
+        return handle.block_on(fut);
+    }
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| handle.block_on(fut))
+            .join()
+            .unwrap_or_else(|_| Err("revoke thread panicked".into()))
+    })
+}
+
+/// Query what the chain stores for `granter` -> `grantee` (authz grants and
+/// the fee allowance). Used to assert a flow left nothing behind.
+pub fn query_grantee_state(daemon: &Daemon, granter: &str, grantee: &str) -> Result<GranteeState, String> {
+    let channel = daemon.sender().channel();
+    let (granter, grantee) = (granter.to_string(), grantee.to_string());
+    run_off_runtime(&daemon.rt_handle, async move { grantee_state(channel, &granter, &grantee).await })
 }
 
 /// One cold signature for the whole session. That signature grants the script
@@ -316,6 +409,13 @@ pub fn enable_relay_sessions(
     Ok(opened)
 }
 
+fn prepare_builder(builder: &DaemonBuilder) -> Result<(), String> {
+    if builder.has_mnemonic() {
+        return Ok(());
+    }
+    crate::ensure_ephemeral_mnemonic(builder.chain_kind())
+}
+
 pub fn enable_session(
     builder: &DaemonBuilder,
     mut session: ApprovalSession,
@@ -324,9 +424,7 @@ pub fn enable_session(
     if session.granter.is_empty() {
         return Err("session refused: empty granter".into());
     }
-    if session.ttl_secs == 0 {
-        return Err("session refused: empty duration".into());
-    }
+    crate::policy::validate_ttl(session.ttl_secs).map_err(|e| format!("session refused: {e}"))?;
     if session.type_urls.is_empty() {
         return Err("session refused: no message types".into());
     }
@@ -337,6 +435,7 @@ pub fn enable_session(
             }
         }
     }
+    prepare_builder(builder)?;
     let daemon = builder
         .build()
         .map_err(|err| format!("session refused: {err}"))?;
@@ -348,6 +447,39 @@ pub fn enable_session(
     handle.block_on(open_authz_session(daemon, session, grantee, automatic))
 }
 
+/// Grant **another wallet** (`grantee`, e.g. an operator's own cold key) the
+/// session scope, signed by the cold key on the loopback page. The grant is
+/// retained: the grantee later relays it from its own short session
+/// ([`ApprovalSession::allow_nested_exec`]) and the granter revokes it with a
+/// revoke session.
+/// The daemon key only broadcasts the cold-signed grant.
+pub fn grant_to(
+    builder: &DaemonBuilder,
+    session: ApprovalSession,
+    grantee: &str,
+    automatic: Vec<SigningRequest>,
+) -> Result<(), String> {
+    if session.granter.is_empty() {
+        return Err("grant refused: empty granter".into());
+    }
+    crate::policy::validate_ttl(session.ttl_secs).map_err(|e| format!("grant refused: {e}"))?;
+    if session.type_urls.is_empty() {
+        return Err("grant refused: no message types".into());
+    }
+    if !session.retain {
+        return Err("grant refused: a grant to another wallet must be retained".into());
+    }
+    crate::policy::validate_chain_address(grantee).map_err(|e| format!("grant refused: {e}"))?;
+    if grantee == session.granter {
+        return Err("grant refused: granter and grantee are the same key".into());
+    }
+    prepare_builder(builder)?;
+    let daemon = builder.build().map_err(|err| format!("grant refused: {err}"))?;
+    let handle = daemon.rt_handle.clone();
+    let run = handle.block_on(open_authz_session(daemon, session, grantee.to_string(), automatic))?;
+    run.close()
+}
+
 /// Build `builder`'s daemon, approve the session grant on the loopback page
 /// when the chain does not already cover it, and return the daemon ready to
 /// broadcast under that grant.
@@ -355,12 +487,11 @@ pub fn enable_approval(builder: &DaemonBuilder, session: ApprovalSession) -> Res
     if session.granter.is_empty() {
         return Err("session refused: empty granter".into());
     }
-    if session.ttl_secs == 0 {
-        return Err("session refused: ttl is 0".into());
-    }
+    crate::policy::validate_ttl(session.ttl_secs).map_err(|e| format!("session refused: {e}"))?;
     if session.type_urls.is_empty() {
         return Err("session refused: no type urls".into());
     }
+    prepare_builder(builder)?;
     let mut daemon = builder
         .build()
         .map_err(|err| format!("daemon refused: {err}"))?;
@@ -375,12 +506,30 @@ pub fn enable_approval(builder: &DaemonBuilder, session: ApprovalSession) -> Res
     Ok(daemon)
 }
 
+/// Use the daemon's prefix and gas settings for the pages. A known preset keeps
+/// its Zigner chain_name; otherwise the prefix is the closest guess.
+pub(crate) fn select_chain(daemon: &Daemon, chain_id: &str) -> Result<(), String> {
+    let info = &daemon.sender().chain_info;
+    let prefix = info.network_info.pub_address_prefix.to_string();
+    let base = crate::chain::ChainProfile::for_prefix(&prefix).unwrap_or_else(|| {
+        crate::chain::ChainProfile::new(chain_id, prefix.clone(), info.gas_denom.clone(), info.gas_price, prefix.clone(), prefix.clone())
+    });
+    let mut profile = base.on_chain_id(chain_id);
+    profile.fee_denom = info.gas_denom.clone();
+    profile.gas_price = info.gas_price;
+    profile.coin_type = info.network_info.coin_type;
+    crate::chain::set_approval_chain(profile)
+}
+
 async fn open_session(
     daemon: &mut Daemon,
     session: &ApprovalSession,
     grantee: &str,
 ) -> Result<(), String> {
     let chain_id = daemon.sender().chain_info.chain_id.clone();
+    let reported = node_chain_id(daemon.sender().channel()).await?;
+    crate::policy::ensure_chain_id(&chain_id, &reported).map_err(|e| format!("session refused: {e}"))?;
+    select_chain(daemon, &chain_id)?;
     let fee_denom = daemon.sender().chain_info.gas_denom.clone();
     let gas_price = daemon.sender().chain_info.gas_price;
     if !gas_price.is_finite() || gas_price < 0.0 {
@@ -419,7 +568,7 @@ async fn open_session(
             Ok(())
         }
         crate::grant::SessionSetup::Sign(tx) => {
-            let batches = crate::grant::pack_qr_batches(&setup, &tx, session.account_index, "terp")?;
+            let batches = crate::grant::pack_qr_batches(&setup, &tx, session.account_index, &crate::chain::approval_chain().zigner_chain_name)?;
             let total = batches.len();
             for (index, (batch_chain, batch)) in batches.into_iter().enumerate() {
                 println!("approval page http://{} ({}/{})", session.bind, index + 1, total);
@@ -439,6 +588,9 @@ async fn open_authz_session(
     automatic: Vec<SigningRequest>,
 ) -> Result<AuthzSession, String> {
     let chain_id = daemon.sender().chain_info.chain_id.clone();
+    let reported = node_chain_id(daemon.sender().channel()).await?;
+    crate::policy::ensure_chain_id(&chain_id, &reported).map_err(|e| format!("session refused: {e}"))?;
+    select_chain(&daemon, &chain_id)?;
     let fee_denom = daemon.sender().chain_info.gas_denom.clone();
     let gas_price = daemon.sender().chain_info.gas_price;
     if !gas_price.is_finite() || gas_price < 0.0 {
@@ -475,7 +627,7 @@ async fn open_authz_session(
     )? {
         crate::grant::SessionSetup::Ready => Vec::new(),
         crate::grant::SessionSetup::Sign(tx) => {
-            pack_qr_batches(&setup, &tx, session.account_index, "terp")?
+            pack_qr_batches(&setup, &tx, session.account_index, &crate::chain::approval_chain().zigner_chain_name)?
         }
     };
     if grant_batches.is_empty() {
@@ -568,6 +720,9 @@ fn allowlist_from_session(session: &ApprovalSession) -> RunAllowlist {
     for call in &session.migrates {
         allow = allow.allow_migrate_unchecked(call.clone());
     }
+    if session.nested_exec {
+        allow = allow.allow_nested_exec();
+    }
     allow
 }
 
@@ -584,6 +739,7 @@ fn finished(
         grantee,
         type_urls: session.type_urls,
         page,
+        closed: false,
     }
 }
 
@@ -773,7 +929,7 @@ fn amino_msg_types(amino: &str) -> Vec<String> {
     out
 }
 
-async fn granter_account(channel: Channel, granter: &str) -> Result<BaseAccount, String> {
+pub(crate) async fn granter_account(channel: Channel, granter: &str) -> Result<BaseAccount, String> {
     let mut client =
         cosmrs::proto::cosmos::auth::v1beta1::query_client::QueryClient::new(channel);
     let response = client
@@ -1017,5 +1173,38 @@ mod tests {
                 }
             ))
         );
+    }
+}
+
+/// Chain-id the node itself reports (tendermint GetNodeInfo), compared against config.
+pub(crate) async fn node_chain_id(channel: tonic::transport::Channel) -> Result<String, String> {
+    use cosmrs::proto::cosmos::base::tendermint::v1beta1::{service_client::ServiceClient, GetNodeInfoRequest};
+    let mut client = ServiceClient::new(channel);
+    let info = client
+        .get_node_info(GetNodeInfoRequest {})
+        .await
+        .map_err(|e| format!("session refused: node info: {e}"))?
+        .into_inner();
+    info.default_node_info
+        .map(|n| n.network)
+        .filter(|n| !n.is_empty())
+        .ok_or_else(|| "session refused: node reports no chain-id".to_string())
+}
+
+#[cfg(test)]
+mod nested_exec_tests {
+    use super::*;
+
+    #[test]
+    fn nested_exec_is_opt_in_and_reaches_the_allowlist() {
+        let plain = ApprovalSession::open("terp1x");
+        assert!(!plain.nested_exec);
+        assert!(!allowlist_from_session(&plain).nested_exec());
+        assert!(ApprovalSession::open("terp1x").allow_sdk("/cosmos.authz.v1beta1.MsgExec").is_err());
+        let s = ApprovalSession::open("terp1x").allow_nested_exec();
+        assert!(s.type_urls.iter().any(|u| u == "/cosmos.authz.v1beta1.MsgExec"));
+        let allow = allowlist_from_session(&s);
+        assert!(allow.nested_exec());
+        assert!(allow.type_urls().iter().any(|u| u == "/cosmos.authz.v1beta1.MsgExec"));
     }
 }

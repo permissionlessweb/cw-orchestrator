@@ -1,0 +1,15 @@
+[package]
+name = "zigner-phone-mock"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Local test double for the Zigner phone. Uses Zigner's own Rust signing code; throwaway in-memory mnemonic only."
+
+[workspace]
+
+[dependencies]
+transaction_signing = { path = "../../../../../../../zigner/rust/transaction_signing", features = ["cosmos"] }
+db_handling = { path = "../../../../../../../zigner/rust/db_handling", default-features = false, features = ["active"] }
+tiny-bip39 = { version = "1.0.0", default-features = false }
+hex = "0.4.3"
+base64 = "0.21"

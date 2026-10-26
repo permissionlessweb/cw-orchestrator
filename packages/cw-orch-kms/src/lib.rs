@@ -4,6 +4,10 @@
 //! through `TxExtension.selected_authenticators`.
 
 mod allowlist;
+mod chain;
+mod direct;
+mod ephemeral;
+mod policy;
 mod approval;
 mod capabilities;
 mod grant;
@@ -15,9 +19,14 @@ mod session;
 mod terminal;
 mod tx_extension;
 mod wire;
+#[cfg(test)]
+mod zigner_e2e;
 
+pub use ephemeral::ensure_ephemeral_mnemonic;
+pub use chain::{approval_chain, clear_approval_chain, set_approval_chain, validate_address, ChainProfile, DEFAULT_COIN_TYPE};
+pub use policy::*;
 pub use approval::{
-    enable_approval, enable_relay_sessions, enable_session, ApprovalSession, AuthzSession,
+    enable_approval, enable_relay_sessions, enable_session, grant_to, query_grantee_state, ApprovalSession, AuthzSession,
     DaemonApproval,
 };
 #[cfg(feature = "ict")]
@@ -37,9 +46,13 @@ pub use grant::{
 };
 pub use sender::{FrostKmsOptions, FrostKmsSender};
 pub use session::{ApprovalFactor, Clock, FrostSession, ScriptSession, SessionGrant};
+pub use terminal::{raptor_frames, zigner_frames, zigner_qr_hex, ZIGNER_FRAME_BYTES};
 pub use terminal::{
-    capture_granter, capture_granter_sync, listen, ApprovalView, Approver, Terminal,
+    approval_chain_id, capture_granter, capture_granter_for_chain_sync, capture_granter_sync, listen,
+    set_approval_chain_id, ApprovalView, Approver, Terminal,
     TerminalOutcome, TestApprover,
 };
 pub use tx_extension::add_authenticator_any;
 pub use wire::{encode_group_vk, verify_group_signature, FROST_SIG_LEN};
+pub use direct::{canonical_json, exec_contract_as, AminoMsg};
+pub use grant::{GrantScope, LiveContract};

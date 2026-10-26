@@ -55,6 +55,9 @@ impl Principal {
     }
 }
 
+/// `MsgExec`, granted only through [`RunAllowlist::allow_nested_exec`].
+pub const MSG_AUTHZ_EXEC: &str = "/cosmos.authz.v1beta1.MsgExec";
+
 /// What one script run may broadcast. Addresses created during the run
 /// are recorded after instantiate. They are not known at approval time.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -67,9 +70,25 @@ pub struct RunAllowlist {
     stores: BTreeSet<String>,
     executes: Vec<ScopedCall>,
     migrates: Vec<ScopedCall>,
+    /// The grantee may send `MsgExec` as the granter (nested authz). Opt-in only.
+    nested_exec: bool,
 }
 
 impl RunAllowlist {
+    /// Grant `MsgExec` itself (GenericAuthorization), so the grantee can relay
+    /// the granter's own authz grants: `MsgExec{MsgExec{..}}`. The grantee can
+    /// then use every grant the granter holds until this one expires or is
+    /// revoked, so keep the TTL short and revoke at close.
+    pub fn allow_nested_exec(mut self) -> Self {
+        self.nested_exec = true;
+        self.type_urls.insert(MSG_AUTHZ_EXEC.into());
+        self
+    }
+
+    pub fn nested_exec(&self) -> bool {
+        self.nested_exec
+    }
+
     pub fn allow_type(mut self, type_url: impl Into<String>) -> Self {
         self.type_urls.insert(type_url.into());
         self

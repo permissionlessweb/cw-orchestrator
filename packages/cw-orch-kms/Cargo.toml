@@ -7,7 +7,7 @@ license = "LGPL-3.0"
 
 [features]
 default = []
-ict = ["dep:ict-rs", "dep:ict-rs-cw-orch", "dep:bip39"]
+ict = ["dep:ict-rs", "dep:ict-rs-cw-orch"]
 
 [dependencies]
 cosmrs = { workspace = true, features = ["cosmwasm", "grpc"] }
@@ -30,6 +30,8 @@ chrono = "0.4"
 osst = { path = "../../../zeratul/crates/osst", default-features = false, features = ["secp256k1"] }
 prost = { workspace = true }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# Zigner multi-frame QR (qr_reader_phone / qrcode_rtx use raptorq 1.8).
+raptorq = "1.8.1"
 rand = "0.8"
 tokio = { workspace = true }
 # These three publish as one set. Each exact js-sys pins one wasm-bindgen.
@@ -37,7 +39,8 @@ tokio = { workspace = true }
 js-sys = "=0.3.106"
 web-sys = "=0.3.106"
 wasm-bindgen-futures = "=0.4.79"
-bip39 = { version = "2.0.0", features = ["rand"], optional = true }
+bip39 = { version = "2.0.0", features = ["rand"] }
+serde_json = "1"
 ict-rs = { path = "../../../ict-rs/ict-rs", optional = true, default-features = false, features = ["docker", "terp", "testing"] }
 ict-rs-cw-orch = { path = "../../../ict-rs/ict-rs-cw-orch", optional = true, default-features = false }
 

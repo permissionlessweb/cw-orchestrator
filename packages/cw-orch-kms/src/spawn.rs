@@ -93,16 +93,8 @@ impl Drop for SpawnedTerp {
 }
 
 fn signer_mnemonic() -> Result<String, String> {
-    if let Ok(existing) = std::env::var(LOCAL_MNEMONIC_ENV_NAME) {
-        if !existing.trim().is_empty() {
-            return Ok(existing);
-        }
-    }
-    let mnemonic = bip39::Mnemonic::generate(24).map_err(|err| format!("spawn refused: {err}"))?;
-    let phrase = mnemonic.to_string();
-    std::env::set_var(LOCAL_MNEMONIC_ENV_NAME, &phrase);
-    println!("generated ephemeral signer");
-    Ok(phrase)
+    crate::ensure_ephemeral_mnemonic(cw_orch_core::environment::ChainKind::Local)?;
+    std::env::var(LOCAL_MNEMONIC_ENV_NAME).map_err(|err| format!("spawn refused: {err}"))
 }
 
 fn ensure_image_env() -> Result<String, String> {

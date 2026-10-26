@@ -235,7 +235,7 @@ impl ScriptSession {
         }
         let grantee = key
             .public_key()
-            .account_id("terp")
+            .account_id(&crate::chain::approval_chain().bech32_prefix)
             .map_err(|err| format!("session grantee refused: {err}"))?
             .to_string();
         let mut nonce = [0u8; 32];

@@ -270,7 +270,7 @@ pub fn plan_session_setup_with(
     let fee_covers = match &on_chain.feegrant {
         Some(fee) => {
             fee.denom == allowance_denom
-                && fee.limit.map(|limit| limit >= allowance_limit).unwrap_or(true)
+                && fee.limit.map(|limit| limit >= allowance_limit).unwrap_or(false)
                 && covers(fee.expiration_unix, session.expiration_unix)
         }
         None => false,
@@ -493,9 +493,12 @@ fn bundle_chain(chain: &SetupChain, sequence: u64, count: u64) -> SetupChain {
     batch
 }
 
+/// A grant with no expiration never counts as coverage: it is revoked and
+/// replaced by one that expires with this session, so a lost revoke still
+/// ends on its own. An expired or shorter grant is replaced the same way.
 fn covers(expiration: Option<u64>, needed: u64) -> bool {
     match expiration {
-        None => true,
+        None => false,
         Some(at) => at >= needed,
     }
 }
@@ -559,6 +562,7 @@ pub fn parse_wasm_grant(type_url: &str, value: &[u8]) -> Result<Option<LiveAuthz
             _ => 0,
         };
         let keys = match grant.filter {
+            // Live allow-all grants are treated as keyless, which matches nothing.
             Some(any) if any.type_url == AllowAllMessagesFilter::type_url() => Vec::new(),
             Some(any) if any.type_url == AcceptedMessageKeysFilter::type_url() => {
                 AcceptedMessageKeysFilter::decode(any.value.as_slice())
@@ -597,8 +601,13 @@ fn refuse_broad(url: &str, session: &SessionGrant) -> Result<(), String> {
         "/cosmos.authz.v1beta1.MsgExec",
         "/cosmos.feegrant.v1beta1.MsgGrantAllowance",
     ];
-    if FORBIDDEN.contains(&url) {
+    let nested = url == crate::allowlist::MSG_AUTHZ_EXEC && session.allowlist.nested_exec();
+    if FORBIDDEN.contains(&url) && !nested {
         return Err(format!("grant refused: {url} is not granted to a session key"));
+    }
+    for call in session.allowlist.executes().iter().chain(session.allowlist.migrates()) {
+        crate::policy::validate_calls(&call.address, call.calls)
+            .map_err(|e| format!("grant refused: {e}"))?;
     }
     if url == MSG_STORE_CODE && !session.allowlist.has_store_scope() {
         return Err("grant refused: store needs the wasm checksum".into());
@@ -641,7 +650,7 @@ fn scope_covers(live: &LiveAuthz, session: &SessionGrant) -> bool {
                     have.iter().any(|grant| {
                         grant.address == want.address
                             && grant.calls >= want.calls
-                            && (grant.keys.is_empty()
+                            && ((grant.keys.is_empty() && live.type_url == MSG_MIGRATE)
                                 || want.keys.iter().all(|key| grant.keys.iter().any(|have| have == key)))
                     })
                 })
@@ -839,7 +848,16 @@ fn encode_contract_grant(
                 ),
             )
         };
-        let (filter_url, filter_bytes, filter_amino) = if call.keys.is_empty() {
+        // An empty key list is a deny, never AllowAllMessagesFilter: a scoped
+        // call with no keys would otherwise grant every execute message.
+        let (filter_url, filter_bytes, filter_amino) = if call.keys.is_empty() && !migrate {
+            return Err(format!(
+                "authz grant refused: contract {} has no message keys; an empty key list denies",
+                call.address
+            ));
+        } else if call.keys.is_empty() {
+            // Migrate grants are scoped by contract address; the filter only
+            // sees migrate msg keys, so allow-all is kept for migrate only.
             (
                 AllowAllMessagesFilter::type_url(),
                 encode_message(&AllowAllMessagesFilter {})?,
@@ -1232,13 +1250,74 @@ mod tests {
             .unwrap();
         assert_eq!(setup, SessionSetup::Ready);
 
-        let mut unlimited = state.clone();
-        unlimited.feegrant.as_mut().unwrap().limit = None;
-        unlimited.authz[0].expiration_unix = None;
+        // A longer, still-expiring grant is reused as is.
+        let mut longer = state.clone();
+        longer.authz[0].expiration_unix = Some(9_999);
+        longer.feegrant.as_mut().unwrap().limit = Some(1_000);
         let setup =
-            plan_session_setup("terp1granter", session.grant(), &unlimited, "uterp", 25, &chain())
+            plan_session_setup("terp1granter", session.grant(), &longer, "uterp", 25, &chain())
                 .unwrap();
         assert_eq!(setup, SessionSetup::Ready);
+    }
+
+    #[test]
+    fn a_non_expiring_or_unlimited_grant_is_revoked_then_replaced() {
+        let session = session();
+        let mut state = covered(&session);
+        state.authz[0].expiration_unix = None;
+        let tx = sign(
+            plan_session_setup("terp1granter", session.grant(), &state, "uterp", 25, &chain())
+                .unwrap(),
+        );
+        assert_eq!(tx.proto.len(), 2);
+        let revoke = MsgRevoke::decode(tx.proto[0].as_slice()).unwrap();
+        assert_eq!(revoke.msg_type_url, "/cosmos.bank.v1beta1.MsgSend");
+        let grant = MsgGrant::decode(tx.proto[1].as_slice()).unwrap();
+        assert!(grant.grant.unwrap().expiration.is_some());
+
+        let mut state = covered(&session);
+        state.feegrant.as_mut().unwrap().limit = None;
+        let tx = sign(
+            plan_session_setup("terp1granter", session.grant(), &state, "uterp", 25, &chain())
+                .unwrap(),
+        );
+        assert_eq!(tx.proto.len(), 2);
+        MsgRevokeAllowance::decode(tx.proto[0].as_slice()).unwrap();
+        MsgGrantAllowance::decode(tx.proto[1].as_slice()).unwrap();
+
+        let mut state = covered(&session);
+        state.feegrant.as_mut().unwrap().expiration_unix = None;
+        let tx = sign(
+            plan_session_setup("terp1granter", session.grant(), &state, "uterp", 25, &chain())
+                .unwrap(),
+        );
+        assert_eq!(tx.proto.len(), 2);
+        MsgRevokeAllowance::decode(tx.proto[0].as_slice()).unwrap();
+    }
+
+    #[test]
+    fn an_expired_grant_is_revoked_then_replaced_and_no_duplicate_allowance() {
+        let session = session();
+        let mut state = covered(&session);
+        // Expired before this session even starts.
+        for grant in &mut state.authz {
+            grant.expiration_unix = Some(10);
+        }
+        state.feegrant.as_mut().unwrap().expiration_unix = Some(10);
+        let tx = sign(
+            plan_session_setup("terp1granter", session.grant(), &state, "uterp", 25, &chain())
+                .unwrap(),
+        );
+        // 2 revokes + 1 revoke allowance + 2 grants + 1 allowance; the revoke
+        // allowance precedes the grant allowance so the chain never sees a
+        // second allowance ("fee allowance already exists").
+        assert_eq!(tx.proto.len(), 6);
+        MsgRevoke::decode(tx.proto[0].as_slice()).unwrap();
+        MsgRevoke::decode(tx.proto[1].as_slice()).unwrap();
+        MsgRevokeAllowance::decode(tx.proto[2].as_slice()).unwrap();
+        MsgGrantAllowance::decode(tx.proto[5].as_slice()).unwrap();
+        let text = String::from_utf8(tx.amino.clone()).unwrap();
+        assert!(text.find("MsgRevokeAllowance").unwrap() < text.find("MsgGrantAllowance").unwrap());
     }
 
     #[test]
