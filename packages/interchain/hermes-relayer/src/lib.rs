@@ -1,5 +1,6 @@
 pub mod channel;
 pub mod config;
+pub mod connection;
 pub mod core;
 pub mod interchain_env;
 pub mod keys;

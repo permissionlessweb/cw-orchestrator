@@ -296,8 +296,8 @@ impl PacketInspector {
         let recv_packet_sequence = recv_event
             .get_first_attribute_value("packet_sequence")
             .unwrap();
-        let recv_packet_data = recv_event.get_first_attribute_value("packet_data").unwrap();
-        let acknowledgment = recv_event.get_first_attribute_value("packet_ack").unwrap();
+        let recv_packet_data = attr_compat(recv_event, "packet_data").unwrap();
+        let acknowledgment = attr_compat(recv_event, "packet_ack").unwrap();
 
         // We try to unpack the acknowledgement if possible, when it's following the standard format (is not enforced so it's not always possible)
         let decoded_ack_string =
@@ -522,10 +522,27 @@ impl PacketInspector {
     }
 }
 
+/// ibc-go v10 dropped `packet_connection` (now `connection_id`) and the non-hex
+/// `packet_data` / `packet_ack` attributes; fall back to those.
+fn attr_compat(e: &TxResultBlockEvent, name: &str) -> Option<String> {
+    if let Some(v) = e.get_first_attribute_value(name) {
+        return Some(v);
+    }
+    if name == "packet_connection" {
+        return e.get_first_attribute_value("connection_id");
+    }
+    let hex_v = e.get_first_attribute_value(&format!("{name}_hex"))?;
+    let bytes = (0..hex_v.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(hex_v.get(i..i + 2)?, 16).ok())
+        .collect::<Option<Vec<u8>>>()?;
+    String::from_utf8(bytes).ok()
+}
+
 fn get_events(events: &[TxResultBlockEvent], attr_name: &str) -> Vec<String> {
     events
         .iter()
-        .map(|e| e.get_first_attribute_value(attr_name).unwrap())
+        .map(|e| attr_compat(e, attr_name).unwrap())
         .collect()
 }
 
