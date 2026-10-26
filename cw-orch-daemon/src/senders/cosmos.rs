@@ -473,11 +473,10 @@ impl Signer for Wallet {
         Ok(self.chain_info.gas_price)
     }
 
+    /// The key that signs. An authz granter is not this account: it only
+    /// appears on the outer `MsgExec`. Store and bank use `msg_sender`.
     fn account_id(&self) -> AccountId {
-        match self.authz_granter() {
-            Some(granter_addr) => AccountId::from_str(granter_addr.as_str()).unwrap(),
-            None => self.signer_account_id(),
-        }
+        self.signer_account_id()
     }
 
     fn signer_account_id(&self) -> AccountId {

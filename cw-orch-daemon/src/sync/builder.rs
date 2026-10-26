@@ -1,7 +1,7 @@
 use crate::senders::builder::SenderBuilder;
 
 use crate::{DaemonAsyncBuilder, DaemonBase, DaemonState, Wallet, RUNTIME};
-use cw_orch_core::environment::ChainInfoOwned;
+use cw_orch_core::environment::{ChainInfoOwned, ChainKind};
 
 use super::super::error::DaemonError;
 
@@ -78,6 +78,18 @@ impl DaemonBuilder {
     pub fn grpc_url(&mut self, url: impl Into<String>) -> &mut Self {
         self.chain.grpc_urls = vec![url.into()];
         self
+    }
+
+    /// Chain kind used to choose the mnemonic variable.
+    pub fn chain_kind(&self) -> ChainKind {
+        self.chain.kind.clone()
+    }
+
+    /// True when this builder already carries a mnemonic.
+    pub fn has_mnemonic(&self) -> bool {
+        self.mnemonic
+            .as_ref()
+            .is_some_and(|mnemonic| !mnemonic.trim().is_empty())
     }
 
     /// Set the mnemonic used for the default Cosmos wallet
