@@ -942,14 +942,87 @@ pub(crate) async fn granter_account(channel: Channel, granter: &str) -> Result<B
     let any = response
         .account
         .ok_or_else(|| format!("granter account refused: {granter} has no account"))?;
-    if any.type_url.ends_with("BaseAccount") {
-        return BaseAccount::decode(any.value.as_slice())
-            .map_err(|err| format!("granter account refused: {err}"));
+    decode_signer_account(granter, &any)
+}
+
+/// Account number / sequence / pubkey of a signing account. Accepts
+/// `BaseAccount` and the x/auth vesting accounts (their inner
+/// `BaseVestingAccount.base_account`). Module and unknown types are refused.
+pub(crate) fn decode_signer_account(granter: &str, any: &cosmrs::Any) -> Result<BaseAccount, String> {
+    use cosmrs::proto::cosmos::vesting::v1beta1::{
+        BaseVestingAccount, ContinuousVestingAccount, DelayedVestingAccount, PeriodicVestingAccount,
+        PermanentLockedAccount,
+    };
+    let bytes = any.value.as_slice();
+    let err = |e: prost::DecodeError| format!("granter account refused: {granter} ({}): {e}", any.type_url);
+    let inner = |b: Option<BaseVestingAccount>| -> Result<BaseAccount, String> {
+        b.and_then(|v| v.base_account)
+            .ok_or_else(|| format!("granter account refused: {granter} is {} with no base account", any.type_url))
+    };
+    match any.type_url.as_str() {
+        "/cosmos.auth.v1beta1.BaseAccount" => BaseAccount::decode(bytes).map_err(err),
+        "/cosmos.vesting.v1beta1.DelayedVestingAccount" => {
+            inner(DelayedVestingAccount::decode(bytes).map_err(err)?.base_vesting_account)
+        }
+        "/cosmos.vesting.v1beta1.ContinuousVestingAccount" => {
+            inner(ContinuousVestingAccount::decode(bytes).map_err(err)?.base_vesting_account)
+        }
+        "/cosmos.vesting.v1beta1.PeriodicVestingAccount" => {
+            inner(PeriodicVestingAccount::decode(bytes).map_err(err)?.base_vesting_account)
+        }
+        "/cosmos.vesting.v1beta1.PermanentLockedAccount" => {
+            inner(PermanentLockedAccount::decode(bytes).map_err(err)?.base_vesting_account)
+        }
+        other => Err(format!(
+            "granter account refused: {granter} is {other}; only BaseAccount and vesting accounts can sign a session"
+        )),
     }
-    Err(format!(
-        "granter account refused: {} is {} and this session signs a base account",
-        granter, any.type_url
-    ))
+}
+
+#[cfg(test)]
+mod signer_account_tests {
+    use super::*;
+    use cosmrs::proto::cosmos::auth::v1beta1::ModuleAccount;
+    use cosmrs::proto::cosmos::vesting::v1beta1::*;
+
+    fn base() -> BaseAccount {
+        BaseAccount {
+            address: "terp1granter".into(),
+            pub_key: Some(cosmrs::proto::Any { type_url: "/cosmos.crypto.secp256k1.PubKey".into(), value: vec![10, 33, 2, 7] }),
+            account_number: 19,
+            sequence: 241,
+        }
+    }
+    fn bva() -> Option<BaseVestingAccount> {
+        Some(BaseVestingAccount { base_account: Some(base()), end_time: 1, ..Default::default() })
+    }
+    fn any<M: prost::Message>(t: &str, m: &M) -> cosmrs::Any {
+        cosmrs::Any { type_url: t.into(), value: m.encode_to_vec() }
+    }
+    fn check(a: cosmrs::Any) {
+        let got = decode_signer_account("terp1granter", &a).unwrap();
+        assert_eq!((got.account_number, got.sequence), (19, 241), "{}", a.type_url);
+        assert_eq!(got.pub_key, base().pub_key, "{}", a.type_url);
+    }
+
+    #[test]
+    fn base_and_vesting_accounts_decode() {
+        check(any("/cosmos.auth.v1beta1.BaseAccount", &base()));
+        check(any("/cosmos.vesting.v1beta1.DelayedVestingAccount", &DelayedVestingAccount { base_vesting_account: bva() }));
+        check(any("/cosmos.vesting.v1beta1.ContinuousVestingAccount", &ContinuousVestingAccount { base_vesting_account: bva(), start_time: 0 }));
+        check(any("/cosmos.vesting.v1beta1.PeriodicVestingAccount", &PeriodicVestingAccount { base_vesting_account: bva(), start_time: 0, vesting_periods: vec![] }));
+        check(any("/cosmos.vesting.v1beta1.PermanentLockedAccount", &PermanentLockedAccount { base_vesting_account: bva() }));
+    }
+
+    #[test]
+    fn module_unknown_and_empty_vesting_refused() {
+        let m = ModuleAccount { base_account: Some(base()), name: "gov".into(), permissions: vec![] };
+        let e = decode_signer_account("terp1granter", &any("/cosmos.auth.v1beta1.ModuleAccount", &m)).unwrap_err();
+        assert!(e.contains("ModuleAccount"), "{e}");
+        assert!(decode_signer_account("terp1granter", &cosmrs::Any { type_url: "/x.Unknown".into(), value: vec![] }).is_err());
+        let empty = any("/cosmos.vesting.v1beta1.DelayedVestingAccount", &DelayedVestingAccount { base_vesting_account: None });
+        assert!(decode_signer_account("terp1granter", &empty).unwrap_err().contains("no base account"));
+    }
 }
 
 async fn grantee_state(
