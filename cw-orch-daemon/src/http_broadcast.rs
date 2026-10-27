@@ -117,14 +117,16 @@ pub async fn find_tx_with_fallback(
     }
 }
 
-/// Polls the rpc urls then the lcd until the tx is in a block (about 60s).
+/// Polls the rpc urls then the lcd until the tx is in a block.
+/// `CW_ORCH_HTTP_TX_WAIT_SECS` sets the wait (default 60s, polled every 3s).
 pub async fn find_tx(
     hash: &str,
     rpc_urls: &[String],
     lcd_url: Option<&str>,
 ) -> Result<CosmTxResponse, DaemonError> {
     let mut last = None;
-    for attempt in 0..20 {
+    let wait: u64 = std::env::var("CW_ORCH_HTTP_TX_WAIT_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(60);
+    for attempt in 0..(wait / 3).max(1) {
         match find_tx_once(hash, rpc_urls, lcd_url).await {
             Ok(response) => return Ok(response),
             Err(err) => {
