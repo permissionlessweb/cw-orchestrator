@@ -155,15 +155,13 @@ impl<T: Signer + Sync> TxSender for T {
             .await?;
 
         let hash = tx_response.txhash.clone();
-        let resp = match Node::new_async(self.channel())._find_tx(hash.clone()).await {
-            Ok(response) => response,
-            Err(err) if crate::http_broadcast::is_transport_error(&err) => {
-                println!("grpc tx query failed: {err}");
-                crate::http_broadcast::find_tx(&hash, &self.rpc_urls(), self.lcd_url().as_deref())
-                    .await?
-            }
-            Err(err) => return Err(err),
-        };
+        let resp = crate::http_broadcast::find_tx_with_fallback(
+            self.channel(),
+            &hash,
+            &self.rpc_urls(),
+            self.lcd_url().as_deref(),
+        )
+        .await?;
 
         assert_broadcast_code_cosm_response(resp)
     }

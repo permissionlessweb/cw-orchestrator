@@ -824,9 +824,14 @@ async fn broadcast_grant(
     }
     // Sync broadcast returns after CheckTx. The upload must wait until the
     // grant is in a block, or the feegrant lookup finds nothing.
-    let committed = cw_orch_daemon::queriers::Node::new_async(daemon.sender().channel())
-        ._find_tx(response.txhash)
-        .await
+    let sender = daemon.sender();
+    let committed = cw_orch_daemon::http_broadcast::find_tx_with_fallback(
+        sender.channel(),
+        &response.txhash,
+        &sender.rpc_urls(),
+        sender.lcd_url().as_deref(),
+    )
+    .await
         .map_err(|err| format!("grant broadcast refused: {err}"))?;
     if committed.code != 0 {
         return Err(format!(

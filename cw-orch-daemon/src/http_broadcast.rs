@@ -95,7 +95,54 @@ pub async fn broadcast(
     Err(DaemonError::StdErr(errors.join("; ")))
 }
 
+/// Waits for `hash` over gRPC, then over the CometBFT RPC urls and the LCD.
+/// Any gRPC error falls back (a dead channel can surface as "tx not found").
+pub async fn find_tx_with_fallback(
+    channel: tonic::transport::Channel,
+    hash: &str,
+    rpc_urls: &[String],
+    lcd_url: Option<&str>,
+) -> Result<CosmTxResponse, DaemonError> {
+    let node = crate::queriers::Node::new_async(channel);
+    if rpc_urls.is_empty() && lcd_url.is_none() {
+        return node._find_tx(hash.to_string()).await;
+    }
+    // Few gRPC tries only: a broken channel would otherwise back off for minutes.
+    match node._find_tx_with_retries(hash.to_string(), 3).await {
+        Ok(response) => Ok(response),
+        Err(err) => {
+            println!("grpc tx query failed: {err}");
+            find_tx(hash, rpc_urls, lcd_url).await
+        }
+    }
+}
+
+/// Polls the rpc urls then the lcd until the tx is in a block (about 60s).
 pub async fn find_tx(
+    hash: &str,
+    rpc_urls: &[String],
+    lcd_url: Option<&str>,
+) -> Result<CosmTxResponse, DaemonError> {
+    let mut last = None;
+    for attempt in 0..20 {
+        match find_tx_once(hash, rpc_urls, lcd_url).await {
+            Ok(response) => return Ok(response),
+            Err(err) => {
+                if rpc_urls.is_empty() && lcd_url.is_none() {
+                    return Err(err);
+                }
+                if attempt == 0 {
+                    println!("tx {hash} not found over rpc/lcd yet, retrying: {err}");
+                }
+                last = Some(err);
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+    Err(last.unwrap())
+}
+
+async fn find_tx_once(
     hash: &str,
     rpc_urls: &[String],
     lcd_url: Option<&str>,
