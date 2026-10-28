@@ -1,0 +1,343 @@
+//! Offline tests. TEST-ONLY seed: derived from fixed bytes, holds nothing.
+//! `zigner_sign` reimplements Zigner's `sign_penumbra_transaction`
+//! (re-parse request, re-decode plan, recompute + compare effect hash, sign
+//! each randomizer with ask.randomize(r)) so the wire formats are exercised
+//! end to end without a phone.
+
+use cw_orch_kms_penumbra::{
+    auth::{verify_response, ZignerResponse},
+    custody::ZignerCustody,
+    policy::Policy,
+    qr::{raptor_frames, ZignerRequest},
+    summary::summarize,
+    PinnedAccount,
+};
+use decaf377::Fr;
+use penumbra_sdk_asset::{asset::Cache, Value, STAKING_TOKEN_ASSET_ID};
+use penumbra_sdk_dex::{
+    lp::{action::PositionClose, plan::{PositionOpenPlan, PositionWithdrawPlan}, position::Position, Reserves},
+    DirectedTradingPair,
+};
+use penumbra_sdk_fee::Fee;
+use penumbra_sdk_keys::{keys::{Bip44Path, SeedPhrase, SpendKey}, Address, FullViewingKey};
+use penumbra_sdk_proto::DomainType;
+use penumbra_sdk_shielded_pool::{Ics20Withdrawal, Note, OutputPlan, SpendPlan};
+use penumbra_sdk_transaction::{ActionPlan, TransactionParameters, TransactionPlan};
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
+use std::{str::FromStr, sync::Arc, time::Duration};
+
+const USER_DEST: &str = "penumbra1gmapdgqxe0s20trdqz0fulurzgk0agyzawp3ymtm4msks4mu9kvhm3ghw3rah3l7g727xuj5vw9jjg596ec2ecprw3hpta05rfx4djrl0y6e4ujj6cvmcf7t93ldcsquzmqf22";
+
+fn test_key(tag: u8) -> SpendKey {
+    let seed = SeedPhrase::from_randomness(&[tag; 32]);
+    SpendKey::from_seed_phrase_bip44(seed, &Bip44Path::new(0))
+}
+
+fn params() -> TransactionParameters {
+    TransactionParameters { expiry_height: 0, chain_id: "penumbra-1".into(), fee: Fee::from_staking_token_amount(2000u64.into()) }
+}
+
+fn upenumbra(n: u64) -> Value {
+    Value { amount: n.into(), asset_id: *STAKING_TOKEN_ASSET_ID }
+}
+
+fn spend(rng: &mut ChaCha20Rng, fvk: &FullViewingKey, v: Value, pos: u64) -> SpendPlan {
+    let (addr, _) = fvk.payment_address(0u32.into());
+    let note = Note::generate(rng, &addr, v);
+    SpendPlan::new(rng, note, pos.into())
+}
+
+fn ics20_plan(fvk: &FullViewingKey) -> TransactionPlan {
+    let mut rng = ChaCha20Rng::seed_from_u64(1);
+    let (ret, _) = fvk.payment_address(1u32.into());
+    let (me, _) = fvk.payment_address(0u32.into());
+    let denom = Cache::with_known_assets().get_unit("upenumbra").unwrap().base();
+    let w = Ics20Withdrawal {
+        amount: 1_000_000u64.into(),
+        denom,
+        destination_chain_address: "terp1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqtestrecv".into(),
+        return_address: ret,
+        timeout_height: ibc_types::core::client::Height::new(1, 10_000_000).unwrap(),
+        timeout_time: 1_899_999_960_000_000_000,
+        source_channel: ibc_types::core::channel::ChannelId::from_str("channel-4").unwrap(),
+        use_compat_address: true,
+        ics20_memo: String::new(),
+        use_transparent_address: false,
+    };
+    TransactionPlan {
+        actions: vec![
+            ActionPlan::Spend(spend(&mut rng, fvk, upenumbra(1_500_000), 3)),
+            ActionPlan::Spend(spend(&mut rng, fvk, upenumbra(10_000), 9)),
+            ActionPlan::Ics20Withdrawal(w),
+            ActionPlan::Output(OutputPlan::new(&mut rng, upenumbra(508_000), me)),
+        ],
+        transaction_parameters: params(),
+        detection_data: None,
+        memo: None,
+    }
+}
+
+fn lp_plan(fvk: &FullViewingKey) -> TransactionPlan {
+    let mut rng = ChaCha20Rng::seed_from_u64(2);
+    let gm = Cache::with_known_assets().get_unit("ugm").unwrap().id();
+    let pair = DirectedTradingPair::new(*STAKING_TOKEN_ASSET_ID, gm);
+    let pos = Position::new(&mut rng, pair, 30, 1u64.into(), 1u64.into(), Reserves { r1: 1_000_000u64.into(), r2: 0u64.into() });
+    let old = Position::new(&mut rng, pair, 50, 2u64.into(), 1u64.into(), Reserves { r1: 5u64.into(), r2: 7u64.into() });
+    TransactionPlan {
+        actions: vec![
+            ActionPlan::Spend(spend(&mut rng, fvk, upenumbra(1_002_000), 1)),
+            ActionPlan::PositionOpen(PositionOpenPlan { position: pos, metadata: None }),
+            ActionPlan::PositionClose(PositionClose { position_id: old.id() }),
+            ActionPlan::PositionWithdraw(PositionWithdrawPlan {
+                reserves: old.reserves.clone(),
+                position_id: old.id(),
+                pair: old.phi.pair,
+                sequence: 0,
+                rewards: vec![],
+            }),
+        ],
+        transaction_parameters: params(),
+        detection_data: None,
+        memo: None,
+    }
+}
+
+/// What Zigner does with a scanned `53 03 10` request.
+fn zigner_sign(request: &[u8], sk: &SpendKey) -> anyhow::Result<String> {
+    let req = ZignerRequest::decode(request)?;
+    let plan = TransactionPlan::decode(req.plan_bytes.as_slice())?;
+    let eh = plan.effect_hash(sk.full_viewing_key())?;
+    anyhow::ensure!(eh.as_bytes() == &req.effect_hash, "zigner: effect hash mismatch, refusing");
+    let mut rng = ChaCha20Rng::seed_from_u64(99);
+    let sign = |rs: &Vec<[u8; 32]>, rng: &mut ChaCha20Rng| -> Vec<[u8; 64]> {
+        rs.iter().map(|r| {
+            let r = Fr::from_le_bytes_mod_order(r);
+            sk.spend_auth_key().randomize(&r).sign(&mut *rng, eh.as_bytes()).to_bytes()
+        }).collect()
+    };
+    let resp = ZignerResponse {
+        effect_hash: *eh.as_bytes(),
+        spend_auths: sign(&req.spend_randomizers, &mut rng),
+        delegator_vote_auths: sign(&req.delegator_vote_randomizers, &mut rng),
+        lqt_vote_auths: sign(&req.lqt_vote_randomizers, &mut rng),
+    };
+    Ok(hex::encode(resp.encode())) // Android shows the hex string as the QR text
+}
+
+fn roundtrip(plan: &TransactionPlan, sk: &SpendKey) {
+    let fvk = sk.full_viewing_key();
+    Policy::default().check(plan, fvk).unwrap();
+    let req = ZignerRequest::from_plan(plan, fvk, vec!["penumbra".into()]).unwrap();
+    let bytes = req.encode().unwrap();
+    assert_eq!(&bytes[..3], &[0x53, 0x03, 0x10]);
+    assert_eq!(ZignerRequest::decode(&bytes).unwrap(), req);
+    let hexresp = zigner_sign(&bytes, sk).unwrap();
+    let resp = ZignerResponse::decode_text_or_bytes(hexresp.as_bytes()).unwrap();
+    let data = verify_response(plan, fvk, &resp).unwrap();
+    assert_eq!(data.spend_auths.len(), plan.spend_plans().count());
+    // Same shape as the SDK's own authorizer output.
+    let reference = plan.authorize(ChaCha20Rng::seed_from_u64(5), sk).unwrap();
+    assert_eq!(data.effect_hash, reference.effect_hash);
+    assert_eq!(data.spend_auths.len(), reference.spend_auths.len());
+    // and the proto round-trips (what CustodyService returns)
+    let back = penumbra_sdk_transaction::AuthorizationData::decode(data.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(back.spend_auths.len(), data.spend_auths.len());
+}
+
+#[test]
+fn ics20_transfer_roundtrip() {
+    let sk = test_key(7);
+    roundtrip(&ics20_plan(sk.full_viewing_key()), &sk);
+}
+
+#[test]
+fn lp_open_close_withdraw_roundtrip() {
+    let sk = test_key(7);
+    roundtrip(&lp_plan(sk.full_viewing_key()), &sk);
+}
+
+#[test]
+fn summary_mentions_amounts_and_fee() {
+    let sk = test_key(7);
+    let s = summarize(&ics20_plan(sk.full_viewing_key()), sk.full_viewing_key());
+    let t = s.to_text();
+    println!("{t}");
+    assert!(t.contains("ICS20 transfer out") && t.contains("channel-4") && t.contains("terp1"));
+    assert!(s.fee.contains("penumbra"), "fee: {}", s.fee);
+    assert!(!s.warnings.is_empty());
+    let l = summarize(&lp_plan(sk.full_viewing_key()), sk.full_viewing_key()).to_text();
+    println!("{l}");
+    assert!(l.contains("LP open") && l.contains("LP close") && l.contains("LP withdraw"));
+}
+
+#[test]
+fn other_account_on_phone_is_rejected() {
+    let sk = test_key(7);
+    let other = test_key(8);
+    let plan = ics20_plan(sk.full_viewing_key());
+    let bytes = ZignerRequest::from_plan(&plan, sk.full_viewing_key(), vec![]).unwrap().encode().unwrap();
+    // Real Zigner refuses (its FVK gives another effect hash).
+    assert!(zigner_sign(&bytes, &other).is_err());
+    // A device that signs anyway with the wrong key is caught by us.
+    let good = ZignerResponse::decode_text_or_bytes(zigner_sign(&bytes, &sk).unwrap().as_bytes()).unwrap();
+    let mut rng = ChaCha20Rng::seed_from_u64(3);
+    let mut forged = good.clone();
+    for (s, p) in forged.spend_auths.iter_mut().zip(plan.spend_plans()) {
+        *s = other.spend_auth_key().randomize(&p.randomizer).sign(&mut rng, &good.effect_hash).to_bytes();
+    }
+    let e = verify_response(&plan, sk.full_viewing_key(), &forged).unwrap_err();
+    assert!(e.to_string().contains("does not verify"), "{e}");
+}
+
+#[test]
+fn tampering_is_rejected() {
+    let sk = test_key(7);
+    let fvk = sk.full_viewing_key();
+    let plan = ics20_plan(fvk);
+    let bytes = ZignerRequest::from_plan(&plan, fvk, vec![]).unwrap().encode().unwrap();
+    let good = ZignerResponse::decode_text_or_bytes(zigner_sign(&bytes, &sk).unwrap().as_bytes()).unwrap();
+    let mut bad = good.clone();
+    bad.spend_auths[1][5] ^= 1;
+    assert!(verify_response(&plan, fvk, &bad).is_err());
+    let mut bad = good.clone();
+    bad.effect_hash[0] ^= 1;
+    assert!(verify_response(&plan, fvk, &bad).unwrap_err().to_string().contains("effect hash"));
+    let mut bad = good.clone();
+    bad.spend_auths.pop();
+    assert!(verify_response(&plan, fvk, &bad).is_err());
+    // signatures for one plan don't authorize another
+    let mut other_plan = plan.clone();
+    other_plan.transaction_parameters.fee = Fee::from_staking_token_amount(1u64.into());
+    assert!(verify_response(&other_plan, fvk, &good).is_err());
+    let enc = good.encode();
+    assert!(ZignerResponse::decode(&enc[..enc.len() - 1]).is_err());
+    assert!(ZignerResponse::decode(&[enc.clone(), vec![0]].concat()).is_err());
+}
+
+#[test]
+fn policy_and_pinning() {
+    let sk = test_key(7);
+    let fvk = sk.full_viewing_key();
+    // the user's funding destination is not the test account → pin refuses
+    assert!(Address::from_str(USER_DEST).is_ok());
+    assert!(PinnedAccount::new(&fvk.to_string(), Some(USER_DEST)).is_err());
+    let (mine, _) = fvk.payment_address(0u32.into());
+    assert!(PinnedAccount::new(&fvk.to_string(), Some(&mine.to_string())).is_ok());
+
+    let mut plan = ics20_plan(fvk);
+    let mut rng = ChaCha20Rng::seed_from_u64(4);
+    plan.actions.push(ActionPlan::Output(OutputPlan::new(&mut rng, upenumbra(1), Address::from_str(USER_DEST).unwrap())));
+    assert!(Policy::default().check(&plan, fvk).is_err());
+    let p = Policy { allowed_output_addresses: vec![USER_DEST.into()], ..Default::default() };
+    p.check(&plan, fvk).unwrap();
+
+    let plan = ics20_plan(fvk);
+    let p = Policy { allowed_ics20_receivers: vec!["terp1someoneelse".into()], ..Default::default() };
+    assert!(p.check(&plan, fvk).is_err());
+    let p = Policy { allowed_ics20_channels: vec!["channel-0".into()], ..Default::default() };
+    assert!(p.check(&plan, fvk).is_err());
+    let mut odd = ics20_plan(fvk);
+    if let ActionPlan::Ics20Withdrawal(w) = &mut odd.actions[2] { w.timeout_time += 1; }
+    assert!(Policy::default().check(&odd, fvk).is_err());
+    let p = Policy { chain_id: "penumbra-testnet-phobos-2".into(), ..Default::default() };
+    assert!(p.check(&plan, fvk).is_err());
+    let p = Policy { allowed_actions: vec!["spend".into(), "output".into()], ..Default::default() };
+    assert!(p.check(&plan, fvk).is_err());
+}
+
+#[test]
+fn big_plan_goes_to_raptor_frames() {
+    let sk = test_key(7);
+    let fvk = sk.full_viewing_key();
+    let mut plan = ics20_plan(fvk);
+    let mut rng = ChaCha20Rng::seed_from_u64(6);
+    for i in 0..40 {
+        plan.actions.push(ActionPlan::Spend(spend(&mut rng, fvk, upenumbra(1), 100 + i)));
+    }
+    let bytes = ZignerRequest::from_plan(&plan, fvk, vec![]).unwrap().encode().unwrap();
+    let frames = cw_orch_kms_penumbra::qr::zigner_frames(&bytes).unwrap();
+    assert!(frames.len() > 1, "{} bytes", bytes.len());
+    let again = raptor_frames(&bytes, 1000).unwrap();
+    // any ceil(len/1000) frames reconstruct the request
+    let need = bytes.len().div_ceil(1000);
+    let cfg = raptorq::ObjectTransmissionInformation::with_defaults(bytes.len() as u64, 1000);
+    let mut dec = raptorq::Decoder::new(cfg);
+    let mut out = None;
+    for f in again.iter().rev().take(need + 1) {
+        out = dec.decode(raptorq::EncodingPacket::deserialize(&f[4..]));
+        if out.is_some() { break; }
+    }
+    assert_eq!(out.unwrap(), bytes);
+}
+
+// --- tiny HTTP client for the loopback page (no extra deps) ---
+async fn http(addr: &str, method: &str, path: &str, token: Option<&str>, body: &str) -> (u16, String) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut s = tokio::net::TcpStream::connect(addr).await.unwrap();
+    let tok = token.map(|t| format!("x-approval-token: {t}\r\n")).unwrap_or_default();
+    let req = format!("{method} {path} HTTP/1.1\r\nhost: {addr}\r\n{tok}content-length: {}\r\nconnection: close\r\n\r\n{body}", body.len());
+    s.write_all(req.as_bytes()).await.unwrap();
+    let mut buf = String::new();
+    s.read_to_string(&mut buf).await.unwrap();
+    let code = buf[9..12].parse().unwrap();
+    (code, buf)
+}
+
+#[tokio::test]
+async fn approval_page_and_custody_service_end_to_end() {
+    use penumbra_sdk_proto::custody::v1::{self as pb, custody_service_server::CustodyService};
+    let sk = test_key(7);
+    let fvk = sk.full_viewing_key().clone();
+    let plan = lp_plan(&fvk);
+    let (url_tx, mut url_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let mut c = ZignerCustody::new(PinnedAccount { fvk: fvk.clone() }, Policy::default(), "127.0.0.1:0".parse().unwrap(), Duration::from_secs(30)).unwrap();
+    c.on_page = Some(Arc::new(move |u: &str| { let _ = url_tx.send(u.to_string()); }));
+
+    let req = ZignerRequest::from_plan(&plan, &fvk, vec![]).unwrap().encode().unwrap();
+    let phone = tokio::spawn(async move {
+        let url = url_rx.recv().await.unwrap();
+        let addr = url.trim_start_matches("http://").trim_end_matches('/').to_string();
+        let (code, page) = http(&addr, "GET", "/", None, "").await;
+        assert_eq!(code, 200);
+        assert!(page.contains("LP open") && page.contains("<svg"));
+        let token = page.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+        // no token → refused
+        assert_eq!(http(&addr, "POST", "/response", None, "00").await.0, 403);
+        // garbage → 400, session stays open
+        assert_eq!(http(&addr, "POST", "/response", Some(&token), "abcd").await.0, 400);
+        let hexresp = zigner_sign(&req, &sk).unwrap();
+        let (code, body) = http(&addr, "POST", "/response", Some(&token), &hexresp).await;
+        assert_eq!(code, 200, "{body}");
+    });
+    let resp = c
+        .authorize(tonic::Request::new(pb::AuthorizeRequest { plan: Some(plan.clone().into()), pre_authorizations: vec![] }))
+        .await
+        .unwrap()
+        .into_inner();
+    phone.await.unwrap();
+    let data = penumbra_sdk_transaction::AuthorizationData::try_from(resp.data.unwrap()).unwrap();
+    assert_eq!(data.effect_hash.unwrap(), plan.effect_hash(&fvk).unwrap());
+
+    // refuse path
+    let plan2 = ics20_plan(&fvk);
+    let (url_tx, mut url_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    c.on_page = Some(Arc::new(move |u: &str| { let _ = url_tx.send(u.to_string()); }));
+    let refuser = tokio::spawn(async move {
+        let url = url_rx.recv().await.unwrap();
+        let addr = url.trim_start_matches("http://").trim_end_matches('/').to_string();
+        let (_, page) = http(&addr, "GET", "/", None, "").await;
+        let token = page.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+        http(&addr, "POST", "/refuse", Some(&token), "").await;
+    });
+    let e = c.authorize_plan(&plan2).await.unwrap_err();
+    refuser.await.unwrap();
+    assert!(e.to_string().contains("refused"));
+}
+
+#[test]
+fn page_refuses_non_loopback_and_reserved_port() {
+    assert!(cw_orch_kms_penumbra::page::check_bind("0.0.0.0:8743".parse().unwrap()).is_err());
+    assert!(cw_orch_kms_penumbra::page::check_bind("127.0.0.1:8741".parse().unwrap()).is_err());
+    assert!(cw_orch_kms_penumbra::page::check_bind("127.0.0.1:8743".parse().unwrap()).is_ok());
+}

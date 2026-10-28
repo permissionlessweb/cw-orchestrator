@@ -1,0 +1,46 @@
+[package]
+name = "cw-orch-kms-penumbra"
+version = "0.1.0"
+edition = "2021"
+description = "Zigner (air-gapped QR) custody backend for Penumbra: plan QR, approval page, signature verification, CustodyService on loopback"
+license = "Apache-2.0"
+publish = false
+
+# Standalone: penumbra v2.1.x pins tonic 0.12 / axum 0.7 / prost 0.13, the
+# cw-orchestrator workspace is on tonic 0.14 / axum 0.8. Keeping this crate out
+# of that workspace (own Cargo.lock) avoids a dependency fight.
+[workspace]
+
+[dependencies]
+penumbra-sdk-proto = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1", features = ["rpc"] }
+penumbra-sdk-transaction = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+penumbra-sdk-keys = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+penumbra-sdk-custody = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+penumbra-sdk-asset = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+penumbra-sdk-num = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+penumbra-sdk-dex = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1", default-features = false }
+penumbra-sdk-shielded-pool = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1", default-features = false }
+penumbra-sdk-fee = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1", default-features = false }
+penumbra-sdk-txhash = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+decaf377 = "0.10.1"
+decaf377-rdsa = "0.11"
+anyhow = "1"
+hex = "0.4"
+prost = "0.13.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tonic = "0.12.3"
+axum = "0.7.9"
+tokio = { version = "1", features = ["full"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+raptorq = "1.8.1"
+subtle = "2"
+rand_core = { version = "0.6", features = ["getrandom"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+penumbra-sdk-tct = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
+ibc-types = { version = "0.15", default-features = false }
+rand_chacha = "0.3"

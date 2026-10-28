@@ -3,6 +3,8 @@ exclude = [
     # TODO: add new after cw-orch-core 2.0.0 as it's breaking, it shouldn't be compatible
     "contracts-ws",
     "test_contracts/compatibility-test",
+    # own workspace: penumbra v2.1 pins tonic 0.12 / axum 0.7
+    "packages/cw-orch-kms-penumbra",
 ]
 members = [
     "cw-orch",
