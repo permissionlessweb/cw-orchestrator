@@ -457,6 +457,56 @@ fn ownership_any_account_and_randomized_address() {
     assert!(info.zigner_account.is_some());
 }
 
+/// Byte-exact Zigner `export_penumbra_fvk` UR (rust/signer/src/lib.rs): wallet id,
+/// tag 49302, fvk text, index, name, zid. Zigner derives the exported key as
+/// penumbra-sdk does (pbkdf2 + BIP32 m/44h/6532h/{account}h), so the FVK owns
+/// `payment_address(0)` of the SDK derivation.
+fn zigner_exact_ur(fvk: &FullViewingKey, account: u8, label: &str) -> String {
+    let s = fvk.to_string();
+    let mut c = vec![0xa2, 0x01, 0x58, 0x20];
+    c.extend_from_slice(&fvk.wallet_id().0);
+    c.extend_from_slice(&[0x02, 0x81, 0xd9, 0xc0, 0x96, 0xa0 + 4, 0x01, 0x78, s.len() as u8]);
+    c.extend_from_slice(s.as_bytes());
+    c.extend_from_slice(&[0x02, account]);
+    c.extend_from_slice(&[0x03, 0x60 + label.len() as u8]);
+    c.extend_from_slice(label.as_bytes());
+    c.extend_from_slice(&[0x04, 0x58, 0x20]);
+    c.extend_from_slice(&[7u8; 32]);
+    ur::ur::encode(&c, &ur::Type::Custom("penumbra-accounts"))
+}
+
+#[test]
+fn zigner_exact_ur_export_regression() {
+    use penumbra_sdk_keys::keys::{Bip44Path, SeedPhrase, SpendKey};
+    // public BIP39 test vector, never a real wallet
+    let m = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    let sk = SpendKey::from_seed_phrase_bip44(SeedPhrase::from_str(m).unwrap(), &Bip44Path::new(0));
+    let fvk = sk.full_viewing_key().clone();
+    let ur = zigner_exact_ur(&fvk, 0, "cold");
+    let (got, info) = session::parse_fvk_export_info(ur.as_bytes()).unwrap();
+    assert_eq!(got, fvk);
+    assert_eq!((info.format, info.zigner_account), ("ur", Some(0)));
+    let sdk_addr = fvk.payment_address(0u32.into()).0;
+    assert!(session::pin(got.clone(), &sdk_addr).is_ok());
+    // Zigner receive screen (db_handling::penumbra::keys, blake2b "PenumbraSpendKey"
+    // + AES-ECB diversifier) for this seed: NOT a key-owned address. Same seed, refused.
+    let zigner_receive = Address::from_str(ZIGNER_DB_HANDLING_ADDR_ABANDON).unwrap();
+    assert_ne!(zigner_receive, sdk_addr);
+    let o = session::Ownership::of(&got, &zigner_receive);
+    assert!(!o.owned());
+    // wallet-id-only payloads are rejected with a pointer to the right screen
+    let e = session::parse_fvk_export(fvk.wallet_id().to_string().as_bytes()).unwrap_err().to_string();
+    assert!(e.contains("wallet id, not the viewing key"));
+    let mut c = vec![0xa1, 0x01, 0x58, 0x20];
+    c.extend_from_slice(&fvk.wallet_id().0);
+    let e = session::parse_fvk_export(ur::ur::encode(&c, &ur::Type::Custom("penumbra-accounts")).as_bytes()).unwrap_err().to_string();
+    assert!(e.contains("wallet id, not the viewing key"));
+    // tampered wallet id inside the UR
+    let mut c2 = ur::ur::decode(&ur).unwrap().1;
+    c2[4] ^= 1;
+    assert!(session::parse_fvk_export(ur::ur::encode(&c2, &ur::Type::Custom("penumbra-accounts")).as_bytes()).is_err());
+}
+
 #[test]
 fn session_home_is_remote_custody_only_and_wipes() {
     let fvk = test_key(7).full_viewing_key().clone();
@@ -573,3 +623,7 @@ fn wallet_template_policy_covers_wallet_actions() {
     assert_eq!(shipped.allowed_output_addresses, vec![USER_DEST.to_string()]);
     assert_eq!(shipped.chain_id, "penumbra-1");
 }
+
+/// Address Zigner's receive screen shows for the public "abandon ... about" vector
+/// (computed with zigner rust/db_handling/src/penumbra/keys.rs at e064470d).
+const ZIGNER_DB_HANDLING_ADDR_ABANDON: &str = "penumbra1q9xh805r9tqznerjk0r7ffmyv9u9kwftyslphe6ym7gd88hyx9fzr5rdxwnj68prshpx3530kvxkkpzenvnl0rm4vdkmj7nrw0rjr5u3979cm6258893kjtxvzmssjjwkw58vw";

@@ -57,6 +57,9 @@ pub fn parse_fvk_export_info(input: &[u8]) -> Result<(FullViewingKey, ExportInfo
     let info = |format, zigner_account| ExportInfo { format, zigner_account };
     let text = std::str::from_utf8(input).ok().map(str::trim);
     if let Some(t) = text {
+        if t.starts_with("penumbrawalletid1") {
+            bail!("{WALLET_ID_ONLY}");
+        }
         if t.starts_with(FVK_HRP) {
             return Ok((FullViewingKey::from_str(t)?, info("bech32m", None)));
         }
@@ -65,7 +68,8 @@ pub fn parse_fvk_export_info(input: &[u8]) -> Result<(FullViewingKey, ExportInfo
             if !matches!(kind, ur::ur::Kind::SinglePart) {
                 bail!("multi-part UR: feed parts to UrCollector");
             }
-            return Ok((fvk_from_ur_payload(&bytes)?, info("ur", None)));
+            let (f, a) = fvk_from_ur_payload_info(&bytes)?;
+            return Ok((f, info("ur", a)));
         }
         if t.len() >= 208 && t.len() % 2 == 0 && t.bytes().all(|b| b.is_ascii_hexdigit()) {
             let (f, a) = fvk_from_zigner_binary(&hex::decode(t)?)?;
@@ -106,11 +110,31 @@ fn fvk_from_zigner_binary(d: &[u8]) -> Result<(FullViewingKey, u32)> {
 
 /// The UR CBOR holds the FVK as a bech32m text string; pull it out without a
 /// full CBOR parser (bech32m charset is lowercase alnum).
+const WALLET_ID_ONLY: &str = "this QR is the wallet id, not the viewing key; in Zigner open the Penumbra key, then Export viewing key (FVK) and scan that QR";
+
 fn fvk_from_ur_payload(b: &[u8]) -> Result<FullViewingKey> {
+    fvk_from_ur_payload_info(b).map(|(f, _)| f)
+}
+
+/// Zigner `ur:penumbra-accounts` CBOR: {1: bytes32 wallet_id, 2: [#49302({1: tstr fvk, 2: uint index, ?3: name, ?4: zid})]}.
+/// The embedded wallet id must equal the FVK hash, so a mangled key can never pass.
+fn fvk_from_ur_payload_info(b: &[u8]) -> Result<(FullViewingKey, Option<u32>)> {
     let pat = FVK_HRP.as_bytes();
-    let start = b.windows(pat.len()).position(|w| w == pat).ok_or_else(|| anyhow!("no FVK in UR payload"))?;
+    let Some(start) = b.windows(pat.len()).position(|w| w == pat) else {
+        bail!("{WALLET_ID_ONLY} (UR has no penumbrafullviewingkey)");
+    };
     let end = b[start..].iter().position(|c| !c.is_ascii_lowercase() && !c.is_ascii_digit()).map(|n| start + n).unwrap_or(b.len());
-    Ok(FullViewingKey::from_str(std::str::from_utf8(&b[start..end])?)?)
+    let fvk = FullViewingKey::from_str(std::str::from_utf8(&b[start..end])?)?;
+    if b.len() >= 36 && b[..4] == [0xa2, 0x01, 0x58, 0x20] && b[4..36] != fvk.wallet_id().0 {
+        bail!("wallet id in UR export does not match the FVK");
+    }
+    let index = match b.get(end..) {
+        Some([0x02, n, ..]) if *n < 24 => Some(*n as u32),
+        Some([0x02, 0x18, n, ..]) => Some(*n as u32),
+        Some([0x02, 0x19, h, l, ..]) => Some(u16::from_be_bytes([*h, *l]) as u32),
+        _ => None,
+    };
+    Ok((fvk, index))
 }
 
 /// Accumulates animated (multi-part) UR frames.
@@ -183,7 +207,7 @@ pub fn pin(fvk: FullViewingKey, pinned: &Address) -> Result<PinnedAccount> {
 
 fn export_note(i: &ExportInfo) -> String {
     match i.zigner_account {
-        Some(a) => format!("export {} (Zigner account field {a})", i.format),
+        Some(a) => format!("export {} (Zigner account {a})", i.format),
         None => format!("export {}", i.format),
     }
 }
