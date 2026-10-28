@@ -426,6 +426,38 @@ fn fvk_export_formats_and_pinning() {
 }
 
 #[test]
+fn ownership_any_account_and_randomized_address() {
+    use penumbra_sdk_keys::keys::AddressIndex;
+    let fvk = test_key(7).full_viewing_key().clone();
+    // non-zero account
+    let a5 = fvk.payment_address(AddressIndex::from(5u32)).0;
+    let o = session::Ownership::of(&fvk, &a5);
+    assert_eq!((o.owned(), o.account(), o.randomized()), (true, Some(5), Some(false)));
+    assert!(session::pin(fvk.clone(), &a5).is_ok());
+    // randomized (ephemeral / IBC deposit) address on account 0 and on account 3
+    let mut rng = ChaCha20Rng::seed_from_u64(9);
+    for acct in [0u32, 3] {
+        let (eph, _) = fvk.ephemeral_address(&mut rng, AddressIndex::from(acct));
+        let o = session::Ownership::of(&fvk, &eph);
+        assert_eq!((o.owned(), o.account(), o.randomized()), (true, Some(acct), Some(true)));
+        assert!(session::pin(fvk.clone(), &eph).is_ok());
+        assert!(o.describe().contains("randomized"));
+    }
+    // a foreign wallet's address (other seed) is rejected; messages carry only the short wallet id
+    let other = test_key(8).full_viewing_key().clone();
+    let foreign = other.payment_address(0u32.into()).0;
+    let o = session::Ownership::of(&fvk, &foreign);
+    assert!(!o.owned() && o.account().is_none());
+    let e = session::pin(fvk.clone(), &foreign).unwrap_err().to_string();
+    assert!(e.contains(&o.wallet_id) && !e.contains(&fvk.to_string()));
+    assert!(!o.describe().contains("penumbrafullviewingkey"));
+    // export format + Zigner account field are reported
+    let (_, info) = session::parse_fvk_export_info(&hex::encode(zigner_fvk_binary(&fvk)).into_bytes()).unwrap();
+    assert_eq!(info.format, "zigner-hex");
+    assert!(info.zigner_account.is_some());
+}
+
+#[test]
 fn session_home_is_remote_custody_only_and_wipes() {
     let fvk = test_key(7).full_viewing_key().clone();
     let d = std::env::temp_dir().join(format!("pzc-test-{}", std::process::id()));

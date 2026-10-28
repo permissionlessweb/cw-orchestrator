@@ -21,7 +21,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use penumbra_sdk_keys::{Address, FullViewingKey};
+use penumbra_sdk_keys::{keys::AddressIndex, Address, FullViewingKey};
 use std::{
     io::Write,
     net::SocketAddr,
@@ -40,39 +40,58 @@ const FVK_HRP: &str = "penumbrafullviewingkey1";
 ///   (raw bytes, hex text, or latin-1 text as zxing returns byte-mode QR)
 /// * UR `ur:penumbra-accounts/…` (single part; multi-part via [`UrCollector`])
 pub fn parse_fvk_export(input: &[u8]) -> Result<FullViewingKey> {
+    parse_fvk_export_info(input).map(|(fvk, _)| fvk)
+}
+
+/// Public facts about a scanned export (never the key itself).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExportInfo {
+    /// "bech32m", "zigner-binary", "zigner-hex", "zigner-latin1" or "ur".
+    pub format: &'static str,
+    /// The account field of Zigner's binary export (its BIP44 account), if present.
+    pub zigner_account: Option<u32>,
+}
+
+/// [`parse_fvk_export`] plus which format it was and Zigner's account field.
+pub fn parse_fvk_export_info(input: &[u8]) -> Result<(FullViewingKey, ExportInfo)> {
+    let info = |format, zigner_account| ExportInfo { format, zigner_account };
     let text = std::str::from_utf8(input).ok().map(str::trim);
     if let Some(t) = text {
         if t.starts_with(FVK_HRP) {
-            return Ok(FullViewingKey::from_str(t)?);
+            return Ok((FullViewingKey::from_str(t)?, info("bech32m", None)));
         }
         if t.len() > 3 && t[..3].eq_ignore_ascii_case("ur:") {
             let (kind, bytes) = ur::ur::decode(&t.to_ascii_lowercase()).map_err(|e| anyhow!("ur decode: {e:?}"))?;
             if !matches!(kind, ur::ur::Kind::SinglePart) {
                 bail!("multi-part UR: feed parts to UrCollector");
             }
-            return fvk_from_ur_payload(&bytes);
+            return Ok((fvk_from_ur_payload(&bytes)?, info("ur", None)));
         }
         if t.len() >= 208 && t.len() % 2 == 0 && t.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return fvk_from_zigner_binary(&hex::decode(t)?);
+            let (f, a) = fvk_from_zigner_binary(&hex::decode(t)?)?;
+            return Ok((f, info("zigner-hex", Some(a))));
         }
         // zxing gives byte-mode QR as latin-1 text
         let latin1: Option<Vec<u8>> = t.chars().map(|c| u8::try_from(c as u32).ok()).collect();
         if let Some(b) = latin1 {
             if b.starts_with(&[0x53, 0x03, 0x01]) {
-                return fvk_from_zigner_binary(&b);
+                let (f, a) = fvk_from_zigner_binary(&b)?;
+                return Ok((f, info("zigner-latin1", Some(a))));
             }
         }
     }
     if input.starts_with(&[0x53, 0x03, 0x01]) {
-        return fvk_from_zigner_binary(input);
+        let (f, a) = fvk_from_zigner_binary(input)?;
+        return Ok((f, info("zigner-binary", Some(a))));
     }
     bail!("not a Zigner FVK export (expected bech32m, 53 03 01 binary, or ur:penumbra-accounts)")
 }
 
-fn fvk_from_zigner_binary(d: &[u8]) -> Result<FullViewingKey> {
+fn fvk_from_zigner_binary(d: &[u8]) -> Result<(FullViewingKey, u32)> {
     if d.len() < 104 || d[..3] != [0x53, 0x03, 0x01] {
         bail!("bad Zigner FVK export prelude/length");
     }
+    let account = u32::from_le_bytes([d[3], d[4], d[5], d[6]]);
     let mut o = 3 + 4;
     let label_len = d[o] as usize;
     o += 1 + label_len;
@@ -82,7 +101,7 @@ fn fvk_from_zigner_binary(d: &[u8]) -> Result<FullViewingKey> {
     if fvk.wallet_id().0.as_slice() != wid {
         bail!("wallet id in export does not match the FVK");
     }
-    Ok(fvk)
+    Ok((fvk, account))
 }
 
 /// The UR CBOR holds the FVK as a bech32m text string; pull it out without a
@@ -109,12 +128,64 @@ impl UrCollector {
     }
 }
 
+/// Who owns `address`, decided by the FVK's incoming viewing key
+/// (`FullViewingKey::address_index`: `ivk.views_address` + diversifier
+/// decryption). Works for any account and for randomized/ephemeral addresses.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ownership {
+    /// Short public wallet id (hash of the FVK), safe to show.
+    pub wallet_id: String,
+    pub index: Option<AddressIndex>,
+}
+
+impl Ownership {
+    pub fn of(fvk: &FullViewingKey, address: &Address) -> Self {
+        Self { wallet_id: short_wallet_id(fvk), index: fvk.address_index(address) }
+    }
+    pub fn owned(&self) -> bool {
+        self.index.is_some()
+    }
+    pub fn account(&self) -> Option<u32> {
+        self.index.map(|i| i.account)
+    }
+    /// The address is a randomized (ephemeral / IBC deposit) one.
+    pub fn randomized(&self) -> Option<bool> {
+        self.index.map(|i| i.randomizer != [0u8; 12])
+    }
+    pub fn describe(&self) -> String {
+        match self.index {
+            Some(_) => format!(
+                "wallet {}: owns the pinned address (account {}, {} address)",
+                self.wallet_id,
+                self.account().unwrap_or_default(),
+                if self.randomized() == Some(true) { "randomized" } else { "plain" }
+            ),
+            None => format!("wallet {}: does NOT own the pinned address", self.wallet_id),
+        }
+    }
+}
+
+/// `penumbrawalletid1` plus the first 12 characters of the id (public hash).
+pub fn short_wallet_id(fvk: &FullViewingKey) -> String {
+    let id = fvk.wallet_id().to_string();
+    let n = id.char_indices().nth("penumbrawalletid1".len() + 12).map(|(i, _)| i).unwrap_or(id.len());
+    format!("{}…", &id[..n])
+}
+
 /// Accept the FVK only if it owns the pinned address.
 pub fn pin(fvk: FullViewingKey, pinned: &Address) -> Result<PinnedAccount> {
-    if fvk.address_index(pinned).is_none() {
-        bail!("scanned FVK does not own the pinned wallet address — refusing");
+    let own = Ownership::of(&fvk, pinned);
+    if !own.owned() {
+        bail!("scanned FVK ({}) does not own the pinned wallet address — refusing. A different seed/wallet than the one that holds the address", own.wallet_id);
     }
     Ok(PinnedAccount { fvk })
+}
+
+fn export_note(i: &ExportInfo) -> String {
+    match i.zigner_account {
+        Some(a) => format!("export {} (Zigner account field {a})", i.format),
+        None => format!("export {}", i.format),
+    }
 }
 
 fn check_toml_value(s: &str) -> Result<&str> {
@@ -196,6 +267,8 @@ struct Live {
     expires: Option<Instant>,
     ur: Option<UrCollector>,
     ended: bool,
+    /// Public facts about the last scan (format, wallet id, ownership). Never the FVK.
+    last_scan: Option<String>,
 }
 
 struct Shared {
@@ -227,18 +300,32 @@ async fn import_fvk(State(s): State<Arc<Shared>>, h: HeaderMap, body: axum::body
             Err(e) => Err(e),
         }
     } else {
-        parse_fvk_export(&body)
+        parse_fvk_export_info(&body).map(|(f, i)| (f, i))
+            .map(|(f, i)| { live.last_scan = Some(export_note(&i)); f })
     };
-    // never echo key material in errors
-    let account = match parsed.and_then(|f| pin(f, &s.cfg_pinned)) {
+    // never echo key material in errors or logs: only format, wallet id, ownership
+    let fvk = match parsed {
+        Ok(f) => f,
+        Err(e) => {
+            let msg = format!("rejected: could not read the FVK export: {e:#}");
+            println!("penumbra fvk scan {msg}");
+            live.last_scan = Some(msg.clone());
+            return (StatusCode::BAD_REQUEST, msg).into_response();
+        }
+    };
+    let own = Ownership::of(&fvk, &s.cfg_pinned);
+    let note = format!("{}{}", live.last_scan.take().map(|n| n + "; ").unwrap_or_default(), own.describe());
+    println!("penumbra fvk scan: {note}");
+    live.last_scan = Some(note.clone());
+    let account = match pin(fvk, &s.cfg_pinned) {
         Ok(a) => a,
-        Err(e) => return (StatusCode::BAD_REQUEST, format!("rejected: {e:#}")).into_response(),
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("rejected: {e:#} [{note}]")).into_response(),
     };
     live.account = Some(account);
     live.ur = None;
     drop(live);
     let _ = s.import_tx.send(true);
-    (StatusCode::OK, "FVK accepted for the pinned wallet; starting view session").into_response()
+    (StatusCode::OK, format!("FVK accepted for the pinned wallet; starting view session [{note}]")).into_response()
 }
 
 async fn status(State(s): State<Arc<Shared>>, h: HeaderMap) -> Response {
@@ -253,6 +340,7 @@ async fn status(State(s): State<Arc<Shared>>, h: HeaderMap) -> Response {
         "home": live.home.as_ref().map(|p| p.display().to_string()),
         "expires_in_secs": live.expires.map(|e| e.saturating_duration_since(Instant::now()).as_secs()),
         "pending_approval": s.approvals.is_pending(),
+        "last_scan": live.last_scan,
     });
     ([("content-type", "application/json")], j.to_string()).into_response()
 }
