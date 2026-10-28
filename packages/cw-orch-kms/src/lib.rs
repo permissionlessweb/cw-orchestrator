@@ -17,6 +17,7 @@ mod spawn;
 mod sender;
 mod session;
 mod terminal;
+mod ui_shared;
 mod tx_extension;
 mod wire;
 #[cfg(test)]
@@ -46,7 +47,8 @@ pub use grant::{
 };
 pub use sender::{FrostKmsOptions, FrostKmsSender};
 pub use session::{ApprovalFactor, Clock, FrostSession, ScriptSession, SessionGrant};
-pub use terminal::{raptor_frames, zigner_frames, zigner_qr_hex, ZIGNER_FRAME_BYTES};
+pub use terminal::zigner_qr_hex;
+pub use ui_shared::{raptor_frames, zigner_frames, ZIGNER_FRAME_BYTES};
 pub use terminal::{
     approval_chain_id, capture_granter, capture_granter_for_chain_sync, capture_granter_sync, listen,
     set_approval_chain_id, ApprovalView, Approver, Terminal,

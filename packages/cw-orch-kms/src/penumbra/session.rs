@@ -1,7 +1,8 @@
 //! Scoped, time-limited **view session** for the cold (Zigner) wallet.
 //!
-//! The FVK is never stored by default. A session starts with the approval
-//! page on loopback asking for Zigner's *FVK export* QR. The FVK is accepted
+//! The FVK is never stored by default. A session starts with the run's page
+//! ([`page`], the shared cw-orch-kms page) on loopback asking for Zigner's
+//! *FVK export* QR; the same page then shows every plan that needs the phone. The FVK is accepted
 //! only if it owns the pinned address. It is then held in memory and written
 //! into an ephemeral, 0700 pcli home (config.toml 0600 + pcli's view DB) whose
 //! custody backend is `Remote` → this process's loopback CustodyService, so
@@ -11,12 +12,12 @@
 //! pointer file is deleted. Stale homes from a crash are wiped on next start.
 //! Mirrors cw-orch-kms's session/revoke model.
 
-use crate::{custody, page, policy::Policy, PinnedAccount};
+use super::{custody, page, policy::Policy, PinnedAccount};
 use anyhow::{anyhow, bail, Context, Result};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
@@ -177,17 +178,15 @@ pub struct SessionConfig {
     pub pinned_address: String,
     pub policy: Policy,
     pub node_grpc_url: String,
-    /// Session page (FVK import, status, end). Default 127.0.0.1:8743.
+    /// The run's page: FVK import, status, end and every approval.
+    /// Default 127.0.0.1:8743.
     pub page: SocketAddr,
     /// Custody gRPC pcli talks to. Default 127.0.0.1:8742.
     pub custody: SocketAddr,
-    /// Where per-transaction approval pages appear. Default 127.0.0.1:8744.
-    pub approval_page: SocketAddr,
     pub ttl: Duration,
     pub approval_timeout: Duration,
     /// Parent dir for ephemeral homes; a pointer file `current-home` lives here too.
     pub state_dir: PathBuf,
-    pub zxing_js: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
@@ -195,42 +194,20 @@ struct Live {
     account: Option<PinnedAccount>,
     home: Option<PathBuf>,
     expires: Option<Instant>,
-    pending_approval: Option<String>,
     ur: Option<UrCollector>,
     ended: bool,
 }
 
 struct Shared {
     cfg_pinned: Address,
-    token: String,
-    html: String,
-    zxing: Option<Vec<u8>>,
+    approvals: Arc<page::Approvals>,
     live: Mutex<Live>,
-    approval_url: Arc<std::sync::Mutex<Option<String>>>,
     import_tx: watch::Sender<bool>,
     end_tx: watch::Sender<bool>,
 }
 
-fn loopback_host(h: &HeaderMap) -> bool {
-    let host = h.get("host").and_then(|v| v.to_str().ok()).unwrap_or("");
-    let name = host.rsplit_once(':').map(|(a, _)| a).unwrap_or(host);
-    matches!(name, "127.0.0.1" | "localhost" | "[::1]")
-}
 fn authed(s: &Shared, h: &HeaderMap) -> bool {
-    loopback_host(h) && h.get("x-approval-token").and_then(|v| v.to_str().ok()) == Some(s.token.as_str())
-}
-
-async fn index(State(s): State<Arc<Shared>>, h: HeaderMap) -> Response {
-    if !loopback_host(&h) {
-        return (StatusCode::FORBIDDEN, "loopback only").into_response();
-    }
-    Html(s.html.clone()).into_response()
-}
-async fn zxing_js(State(s): State<Arc<Shared>>) -> Response {
-    match &s.zxing {
-        Some(js) => ([("content-type", "application/javascript")], js.clone()).into_response(),
-        None => StatusCode::NOT_FOUND.into_response(),
-    }
+    page::authed(s.approvals.token(), h)
 }
 
 async fn import_fvk(State(s): State<Arc<Shared>>, h: HeaderMap, body: axum::body::Bytes) -> Response {
@@ -275,7 +252,7 @@ async fn status(State(s): State<Arc<Shared>>, h: HeaderMap) -> Response {
         "wallet_id": live.account.as_ref().map(|a| a.wallet_id()),
         "home": live.home.as_ref().map(|p| p.display().to_string()),
         "expires_in_secs": live.expires.map(|e| e.saturating_duration_since(Instant::now()).as_secs()),
-        "pending_approval": s.approval_url.lock().unwrap().clone(),
+        "pending_approval": s.approvals.is_pending(),
     });
     ([("content-type", "application/json")], j.to_string()).into_response()
 }
@@ -288,48 +265,8 @@ async fn end(State(s): State<Arc<Shared>>, h: HeaderMap) -> Response {
     (StatusCode::OK, "ending session: view home will be wiped").into_response()
 }
 
-fn render(token: &str, pinned: &str, camera: bool) -> String {
-    let cam = if camera {
-        r#"<button id=cam>scan Zigner's FVK export with camera</button><video id=v width=320 height=240 style="display:none"></video><script src="/zxing.js"></script>"#
-    } else {
-        "<p><small>camera scan disabled (set CW_ORCH_KMS_ZXING to zxing's umd/index.min.js)</small></p>"
-    };
-    format!(
-        r#"<!doctype html><html><head><meta charset=utf-8><title>penumbra view session</title>
-<style>body{{font-family:monospace;max-width:900px;margin:2em auto}}textarea{{width:100%;height:5em}}</style></head><body>
-<h2>Penumbra cold-wallet view session</h2>
-<p>pinned wallet address<br><small>{pinned}</small></p>
-<p>On Zigner: Penumbra key → <b>Export viewing key</b>, then scan it here. The key stays in this process's memory and an ephemeral pcli home that is wiped when the session ends.</p>
-{cam}
-<textarea id=t placeholder="or paste the FVK export (bech32m / hex / ur:)"></textarea>
-<button id=imp>import</button> <button id=end>end session (wipe)</button>
-<pre id=out></pre><pre id=st></pre>
-<script>
-const T={token:?};
-const H={{'x-approval-token':T}};
-async function post(p,b){{const r=await fetch(p,{{method:'POST',headers:H,body:b}});document.getElementById('out').textContent=await r.text();return r.status}}
-function enc(s){{if(/^(penumbrafullviewingkey1|ur:)/i.test(s))return s;let h='';for(const c of s)h+=(c.charCodeAt(0)&255).toString(16).padStart(2,'0');return h}}
-document.getElementById('imp').onclick=()=>post('/fvk',document.getElementById('t').value);
-document.getElementById('end').onclick=()=>post('/end','');
-const c=document.getElementById('cam');
-if(c)c.onclick=async()=>{{const v=document.getElementById('v');v.style.display='block';const r=new ZXing.BrowserQRCodeReader();
- for(;;){{const f=await r.decodeOnceFromVideoDevice(undefined,v);const st=await post('/fvk',enc(f.getText()));if(st!==202)break;}}
- r.reset();v.style.display='none'}};
-setInterval(async()=>{{const r=await fetch('/status',{{headers:H}});const j=await r.json();let s='state: '+j.state;
- if(j.wallet_id)s+='\nwallet: '+j.wallet_id;if(j.expires_in_secs!=null)s+='\nexpires in: '+j.expires_in_secs+'s';
- if(j.home)s+='\n\nrun:  pcli --home '+j.home+' view balance';
- document.getElementById('st').textContent=s;
- if(j.pending_approval){{document.getElementById('st').innerHTML+='\n\n<a href="'+j.pending_approval+'" target=_blank>transaction waiting for Zigner approval → open</a>'}}}},1500);
-</script></body></html>"#,
-        pinned = pinned,
-        token = token
-    )
-}
-
 fn token() -> String {
-    let mut b = [0u8; 16];
-    rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut b);
-    hex::encode(b)
+    crate::ui_shared::approval_token()
 }
 
 /// Handle returned by [`start`]: page URL and a future that runs the session.
@@ -344,7 +281,6 @@ pub struct Running {
 pub async fn start(cfg: SessionConfig) -> Result<Running> {
     page::check_bind(cfg.page)?;
     page::check_bind(cfg.custody)?;
-    page::check_bind(cfg.approval_page)?;
     let pinned = Address::from_str(cfg.pinned_address.trim()).context("pinned address")?;
     std::fs::create_dir_all(&cfg.state_dir)?;
     // crash recovery: wipe a home left by a previous run
@@ -353,40 +289,34 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
         let _ = wipe(Path::new(old.trim()));
         let _ = std::fs::remove_file(&pointer);
     }
-    let tok = token();
+    let approvals = page::Approvals::new();
+    let tok = approvals.token().to_string();
     let (import_tx, mut import_rx) = watch::channel(false);
     let (end_tx, mut end_rx) = watch::channel(false);
-    let approval_url = Arc::new(std::sync::Mutex::new(None));
     let shared = Arc::new(Shared {
         cfg_pinned: pinned,
-        token: tok.clone(),
-        html: render(&tok, cfg.pinned_address.trim(), cfg.zxing_js.is_some()),
-        zxing: cfg.zxing_js.clone(),
+        approvals: approvals.clone(),
         live: Mutex::new(Live::default()),
-        approval_url: approval_url.clone(),
         import_tx,
         end_tx,
     });
-    let app = Router::new()
-        .route("/", get(index))
-        .route("/zxing.js", get(zxing_js))
+    let session_routes = Router::new()
         .route("/fvk", post(import_fvk))
         .route("/status", get(status))
         .route("/end", post(end))
         .with_state(shared.clone());
-    let listener = tokio::net::TcpListener::bind(cfg.page).await.with_context(|| format!("binding {}", cfg.page))?;
-    let page_url = format!("http://{}/", listener.local_addr()?);
-    let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
-    let page_srv = tokio::spawn(async move {
-        let _ = axum::serve(listener, app).with_graceful_shutdown(async { let _ = stop_rx.await; }).await;
-    });
+    let card = page::session_card(cfg.pinned_address.trim());
+    let app = page::router(approvals.clone(), Some(&card), session_routes);
+    let (page_url, stop_tx, page_srv) = page::serve(cfg.page, app).await?;
+    println!("penumbra session page {page_url}");
+    let deadline = tokio::time::Instant::now() + cfg.ttl;
 
     let done = tokio::spawn(async move {
         let ended_early = tokio::select! {
             _ = import_rx.wait_for(|v| *v) => false,
             _ = end_rx.wait_for(|v| *v) => true,
             _ = tokio::signal::ctrl_c() => true,
-            _ = tokio::time::sleep(cfg.ttl) => true,
+            _ = tokio::time::sleep_until(deadline) => true,
         };
         let mut home: Option<PathBuf> = None;
         let result: Result<()> = async {
@@ -399,22 +329,18 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
             std::fs::write(&pointer, dir.display().to_string())?;
             home = Some(dir.clone());
             let custody_listener = tokio::net::TcpListener::bind(cfg.custody).await.with_context(|| format!("binding {}", cfg.custody))?;
-            let mut zc = custody::ZignerCustody::new(account, cfg.policy.clone(), cfg.approval_page, cfg.approval_timeout)?;
-            let au = approval_url.clone();
-            zc.on_page = Some(Arc::new(move |u: &str| *au.lock().unwrap() = Some(u.to_string())));
-            let au2 = approval_url.clone();
-            zc.on_done = Some(Arc::new(move || *au2.lock().unwrap() = None));
+            let zc = custody::ZignerCustody::new(account, cfg.policy.clone(), approvals.clone(), cfg.approval_timeout);
             {
                 let mut l = shared.live.lock().await;
                 l.home = Some(dir.clone());
-                l.expires = Some(Instant::now() + cfg.ttl);
+                l.expires = Some(deadline.into_std());
             }
-            eprintln!("view session active for {}s\n  pcli --home {} view balance", cfg.ttl.as_secs(), dir.display());
+            println!("ok view session active for {}s\n  pcli --home {} view balance", deadline.saturating_duration_since(tokio::time::Instant::now()).as_secs(), dir.display());
             tokio::select! {
                 r = custody::serve_listener(zc, custody_listener) => r?,
                 _ = end_rx.wait_for(|v| *v) => {},
                 _ = tokio::signal::ctrl_c() => {},
-                _ = tokio::time::sleep(cfg.ttl) => {},
+                _ = tokio::time::sleep_until(deadline) => {},
             }
             Ok(())
         }
@@ -432,7 +358,7 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
         let _ = std::fs::remove_file(&pointer);
         let _ = stop_tx.send(());
         let _ = page_srv.await;
-        eprintln!("view session ended; ephemeral home wiped");
+        println!("ok view session ended; ephemeral home wiped");
         result
     });
     Ok(Running { page_url, token: tok, done })

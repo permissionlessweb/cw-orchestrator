@@ -1,10 +1,10 @@
-//! Zigner custody for Penumbra.
+//! Zigner custody for Penumbra (`penumbra` feature).
 //!
 //! Penumbra has no authz: every spend in a [`TransactionPlan`] is authorized
 //! by a spend-auth signature over the transaction's effect hash, made with the
 //! spend key randomized by that spend's randomizer. This crate drives that
-//! signature through Zigner (air-gapped phone) the same way cw-orch-kms drives
-//! Cosmos sign docs:
+//! signature through Zigner (air-gapped phone) with the same page, frames and
+//! scanner cw-orch-kms uses for Cosmos sign docs:
 //!
 //! 1. [`policy::Policy::check`] — refuse plans that are not ICS20-out / LP
 //!    open/close/withdraw (plus their spends/outputs) or that send value to
@@ -14,8 +14,10 @@
 //! 4. [`auth::verify_response`] — Zigner's response, checked against the
 //!    effect hash we computed with the *pinned* FVK, giving
 //!    [`AuthorizationData`].
-//! 5. [`page`] — loopback-only approval page; [`custody::ZignerCustody`] —
+//! 5. [`page`] — the run's page, built on the shared [`crate::ui_shared`]
+//!    layout, frames and zxing scanner; [`custody::ZignerCustody`] —
 //!    `penumbra.custody.v1.CustodyService` wrapping all of the above.
+//! 6. [`session`] — FVK import/pinning and the wiped-on-exit pcli view home.
 
 pub mod auth;
 pub mod custody;

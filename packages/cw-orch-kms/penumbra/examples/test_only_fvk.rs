@@ -1,4 +1,4 @@
-//! Prints the FVK + address of the TEST-ONLY seed used by tests/offline.rs
+//! Prints the FVK + address of the TEST-ONLY seed used by tests/penumbra.rs
 //! (SeedPhrase::from_randomness(&[7; 32])). Holds nothing; for local pcli checks.
 use penumbra_sdk_keys::keys::{Bip44Path, SeedPhrase, SpendKey};
 fn main() {

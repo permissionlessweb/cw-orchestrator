@@ -7,9 +7,8 @@ use std::sync::Arc;
 use sha2::Digest;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Path, Request, State};
-use axum::http::{header, HeaderName, HeaderValue};
-use axum::middleware::{self, Next};
+use axum::extract::{Path, State};
+use axum::middleware;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
@@ -18,6 +17,7 @@ use tokio::task::JoinHandle;
 
 use crate::allowlist::{Principal, SignDocDigest, SigningRequest};
 use crate::session::ApprovalFactor;
+use crate::ui_shared::*;
 
 /// Decides whether a named factor may approve this digest.
 /// The test factor is the only one this phase accepts.
@@ -419,7 +419,7 @@ fn serve_with(
         revoke_done: Mutex::new(revoke_done),
         wasm_js: read_vendor("../../../zafu/apps/extension/public/zafu-wasm/zafu_wasm.js"),
         wasm_bg: read_vendor("../../../zafu/apps/extension/public/zafu-wasm/zafu_wasm_bg.wasm"),
-        zxing_js: read_vendor("../../../zafu/node_modules/@zxing/library/umd/index.min.js"),
+        zxing_js: zxing_js_bytes(),
         notes: notes.clone(),
     };
     let app = Router::new()
@@ -534,46 +534,7 @@ fn page(
     format!(
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Zafu session</title>\
 <style>\
-:root{{--bg:#0D0D12;--surface:#16161D;--card:#1E1E26;--line:#2A2A35;--gold:#F4A31E;--text:#E0E0E4;--dim:#707078;--ok:#50C878;--err:#C05050}}\
-*{{box-sizing:border-box}}\
-body{{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.45 Inter,ui-sans-serif,system-ui,sans-serif}}\
-.shell{{max-width:720px;margin:0 auto;padding:28px 20px 72px}}\
-.mark{{margin:0;letter-spacing:.18em;font-size:12px;font-weight:650;color:var(--gold)}}\
-.mark span{{color:var(--dim)}}\
-h1{{font-size:28px;font-weight:650;letter-spacing:-.02em;margin:10px 0 6px}}\
-.lede{{color:var(--dim);margin:0 0 18px}}\
-.row{{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}}\
-.chip{{background:#1B8A5A1f;color:#8fd4ae;border:1px solid #1B8A5A66;border-radius:999px;padding:4px 10px;font-size:13px}}\
-.meta{{color:var(--dim);font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;margin:0 0 18px}}\
-#tabs{{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px}}\
-#tabs:empty{{display:none}}\
-#tabs button{{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font:inherit;cursor:pointer}}\
-#tabs button.is-on{{border-color:var(--gold);color:var(--gold)}}\
-#tabs button.is-done{{border-color:var(--ok);color:var(--ok)}}\
-#tabs button:disabled{{background:var(--card);color:var(--dim);border-color:var(--line);opacity:.55;cursor:default}}\
-section,.card{{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin:10px 0}}\
-.kicker{{color:var(--dim);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}}\
-pre{{white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;margin:0}}\
-#zigner-qr{{background:#fff;border-radius:16px;padding:16px;display:inline-block;margin:8px 0 16px}}\
-#zigner-qr p{{color:#16161D;margin:0}}\
-#scan,#check{{background:var(--gold);color:#16161D;border:0;border-radius:12px;padding:12px 16px;font:600 15px/1 Inter,ui-sans-serif,sans-serif;cursor:pointer}}\
-#scan:disabled,#check:disabled{{background:#3D3020;color:#5A4A30}}\
-#zafu-approve{{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font:600 15px/1 Inter,ui-sans-serif,sans-serif;cursor:pointer}}\
-label{{display:block;color:var(--dim);font-size:13px;margin:14px 0}}\
-input{{width:100%;margin-top:6px;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}}\
-video{{width:min(100%,320px);border-radius:16px;background:#000;margin:8px 0}}\
-#scan-status,#check-result,#zafu-status{{color:var(--ok);min-height:1.2em}}\
-.foot{{color:var(--dim);font-size:13px}}\
-.run{{background:#07070b;border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:18px 0}}\
-.term{{min-height:9em;max-height:280px;overflow:auto;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}}\
-.term div{{white-space:pre-wrap;word-break:break-word}}\
-.term .ok{{color:var(--ok)}}\
-.term .err{{color:var(--err)}}\
-.term .wait{{color:var(--gold)}}\
-.term .dim{{color:var(--dim)}}\
-details{{margin-top:8px}}\
-summary{{cursor:pointer;color:var(--dim);font-size:13px}}
-</style></head>\
+{style}</style></head>\
 <body><div class=\"shell\">\
 <p class=\"mark\">ZAFU <span>·</span> SESSION</p>\
 <h1>Approve this run</h1>\
@@ -603,7 +564,7 @@ summary{{cursor:pointer;color:var(--dim);font-size:13px}}
 </details>\
 </div>\
 <script src=\"/zxing/index.min.js\"></script>\
-{script}</body></html>",
+{shared}{script}</body></html>",
         digest = escape(view.digest.as_str()),
         chain_json = json_string(&approval_chain_id().unwrap_or_default()).replace('<', "\\u003c"),
         principal = escape(view.principal.as_str()),
@@ -612,6 +573,8 @@ summary{{cursor:pointer;color:var(--dim);font-size:13px}}
         actions = actions_json(&view.messages).replace('<', "\\u003c"),
         intro = escape(intro),
         qr = qr,
+        style = PAGE_STYLE,
+        shared = SHARED_SCRIPT,
         script = PAGE_SCRIPT,
     )
 }
@@ -683,90 +646,7 @@ pub(crate) fn zigner_request_fits(account_index: u32, chain_name: &str, sign_doc
     qrcode::QrCode::new(zigner_request(account_index, chain_name, sign_doc)).is_ok()
 }
 
-/// Raptorq symbol size per animated frame. A 1000-byte symbol plus the 8-byte
-/// header fits a version-24 code at ECC L.
-pub const ZIGNER_FRAME_BYTES: u16 = 1000;
-/// Byte-mode capacity of a version-40 code at ECC L (Zigner's own limit).
-const QR_MAX_BYTES: usize = 2953;
-
-/// `CW_ORCH_KMS_QR_FRAME_BYTES=<n>` forces animated frames of `n` bytes even
-/// when the request fits one code (rehearsal / phone testing).
-fn forced_frame_bytes() -> Option<u16> {
-    std::env::var("CW_ORCH_KMS_QR_FRAME_BYTES").ok().and_then(|v| v.trim().parse::<u16>().ok()).filter(|n| *n >= 64)
-}
-
-/// The codes the phone scans for one Zigner request. One plain code when it
-/// fits; otherwise Zigner's fountain frames (see [`raptor_frames`]).
-pub fn zigner_frames(request: &[u8]) -> Result<Vec<Vec<u8>>, String> {
-    match forced_frame_bytes() {
-        Some(n) => raptor_frames(request, n),
-        None if qrcode::QrCode::new(request).is_ok() => Ok(vec![request.to_vec()]),
-        None => raptor_frames(request, ZIGNER_FRAME_BYTES),
-    }
-}
-
-/// Zigner's multi-frame format, byte for byte as `qrcode_rtx::make_data_packs`
-/// writes it and `qr_reader_phone` reads it: each frame is a 4-byte big-endian
-/// header (top bit 1, low 31 bits = total payload length) followed by one
-/// serialized raptorq `EncodingPacket` (`Encoder::with_defaults(input, chunk)`,
-/// `len / chunk` repair packets). Any `ceil(len / chunk)` distinct frames decode.
-pub fn raptor_frames(input: &[u8], chunk: u16) -> Result<Vec<Vec<u8>>, String> {
-    if input.is_empty() {
-        return Err("qr refused: empty request".into());
-    }
-    if input.len() >= 0x8000_0000 || chunk == 0 {
-        return Err("qr refused: request too long".into());
-    }
-    let head = (input.len() as u32 + 0x8000_0000).to_be_bytes();
-    let repair = if input.len() as u32 <= chunk as u32 { 0 } else { input.len() as u32 / chunk as u32 };
-    let encoder = raptorq::Encoder::with_defaults(input, chunk);
-    let frames: Vec<Vec<u8>> = encoder
-        .get_encoded_packets(repair)
-        .iter()
-        .map(|packet| [head.to_vec(), packet.serialize()].concat())
-        .collect();
-    let len = frames.first().map(|f| f.len()).unwrap_or(0);
-    if frames.iter().any(|f| f.len() != len) {
-        return Err("qr refused: frames have different lengths".into());
-    }
-    if len > QR_MAX_BYTES {
-        return Err("qr refused: frame too large for one code".into());
-    }
-    Ok(frames)
-}
-
-fn frame_svg(data: &[u8]) -> String {
-    match qrcode::QrCode::with_error_correction_level(data, qrcode::EcLevel::L) {
-        Ok(code) => code.render::<qrcode::render::svg::Color<'_>>().min_dimensions(240, 240).build(),
-        Err(_) => "<p>this frame does not fit in one code.</p>".to_string(),
-    }
-}
-
-fn json_list(items: &[String]) -> String {
-    let parts: Vec<String> = items.iter().map(|item| json_string(item)).collect();
-    format!("[{}]", parts.join(",")).replace('<', "\\u003c")
-}
-
-fn qr_svg(data: &[u8]) -> String {
-    let Ok(code) = qrcode::QrCode::new(data) else {
-        return "<p>this request does not fit in one code. use approve with zafu.</p>".to_string();
-    };
-    code.render::<qrcode::render::svg::Color<'_>>()
-        .min_dimensions(240, 240)
-        .build()
-}
-
 const PAGE_SCRIPT: &str = r#"<script>
-var qrTimer = null;
-function animateQr(el, frames, single) {
-  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
-  if (!el) return;
-  if (!frames || frames.length < 2) { el.innerHTML = single || ""; return; }
-  var at = 0;
-  var note = "<p class=\"foot\">animated code: " + frames.length + " frames. keep the phone on it until Zigner shows the request.</p>";
-  el.innerHTML = frames[0] + note;
-  qrTimer = setInterval(function () { at = (at + 1) % frames.length; el.innerHTML = frames[at] + note; }, 250);
-}
 (function () {
   var t = document.getElementById("qr-frames");
   if (!t || document.getElementById("bundles")) return;
@@ -808,15 +688,7 @@ function animateQr(el, frames, single) {
   var pTotal = 0;
   var wasmReady = null;
   var zafuArmed = false;
-  function logLine(kind, text) {
-    var log = document.getElementById("term-log");
-    if (!log) return;
-    var row = document.createElement("div");
-    row.className = kind;
-    row.textContent = text;
-    log.appendChild(row);
-    log.scrollTop = log.scrollHeight;
-  }
+  function logLine(kind, text) { cwOrchLog(kind, text); }
   function kindFor(text) {
     if (text.indexOf("ok ") === 0 || text.indexOf("valid ") === 0 || text.indexOf("authorized ") === 0 || text.indexOf("session-ready ") === 0 || text === "approved") return "ok";
     if (text.indexOf("err ") === 0 || text.indexOf("refused") === 0) return "err";
@@ -946,33 +818,23 @@ function animateQr(el, frames, single) {
   }
 
   function startScan() {
-    if (!window.ZXing || !window.ZXing.BrowserQRCodeReader) {
-      scanStatus.textContent = "the QR reader did not load";
-      return;
-    }
-    finished = false;
-    video.hidden = false;
-    scanStatus.textContent = "point the camera at the phone";
     if (reader && reader.reset) {
       try { reader.reset(); } catch (err) {}
     }
-    reader = new window.ZXing.BrowserQRCodeReader(30);
-    cameraOn = true;
-    reader.decodeFromVideoDevice(undefined, video, function (found) {
-      if (!found || finished) return;
-      onFrame(found.getText());
-    }).catch(function (err) {
-      scanStatus.textContent = err && err.message ? err.message : "the camera did not start";
+    var next = cwOrchScan.start(video, scanStatus, function (text) {
+      if (finished) return;
+      onFrame(text);
     });
+    if (!next) return;
+    finished = false;
+    reader = next;
+    cameraOn = true;
   }
 
   function stopScan() {
     cameraOn = false;
     finished = true;
-    if (reader && reader.reset) {
-      try { reader.reset(); } catch (err) {}
-    }
-    if (video) video.hidden = true;
+    cwOrchScan.stop(reader, video);
   }
 
   function onFrame(text) {
@@ -1235,29 +1097,6 @@ function animateQr(el, frames, single) {
 })();
 </script>"#;
 
-fn read_vendor(rel: &str) -> Vec<u8> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(rel);
-    std::fs::read(path).unwrap_or_default()
-}
-
-async fn isolate(request: Request, next: Next) -> Response {
-    let mut response = next.run(request).await;
-    let headers = response.headers_mut();
-    headers.insert(
-        HeaderName::from_static("cross-origin-opener-policy"),
-        HeaderValue::from_static("same-origin"),
-    );
-    headers.insert(
-        HeaderName::from_static("cross-origin-embedder-policy"),
-        HeaderValue::from_static("require-corp"),
-    );
-    headers.insert(
-        HeaderName::from_static("cross-origin-resource-policy"),
-        HeaderValue::from_static("same-origin"),
-    );
-    response
-}
-
 async fn wasm_js(State(state): State<Arc<AppState>>) -> Response {
     vendor_response(&state.wasm_js, "text/javascript")
 }
@@ -1287,12 +1126,6 @@ async fn wasm_snippet(Path(rest): Path<String>) -> Response {
     }
 }
 
-fn vendor_response(bytes: &[u8], content_type: &'static str) -> Response {
-    if bytes.is_empty() {
-        return axum::http::StatusCode::NOT_FOUND.into_response();
-    }
-    ([(header::CONTENT_TYPE, content_type)], bytes.to_vec()).into_response()
-}
 
 fn prompt(view: &ApprovalView, approval: &str) -> String {
     let mut text = format!(
@@ -1309,13 +1142,6 @@ fn prompt(view: &ApprovalView, approval: &str) -> String {
     text
 }
 
-fn escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
 
 async fn index(State(state): State<Arc<AppState>>) -> Html<String> {
     Html(state.html.clone())
@@ -1675,11 +1501,6 @@ fn chain_address(pk: &[u8]) -> Option<String> {
     crate::chain::approval_chain().address(hash.as_slice())
 }
 
-fn approval_token() -> String {
-    let mut bytes = [0u8; 32];
-    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut bytes);
-    hex_encode(&bytes)
-}
 
 fn actions_json(messages: &[SigningRequest]) -> String {
     let mut out = String::from("[");
@@ -1759,24 +1580,6 @@ fn approval_sign_bytes(
         .into_bytes()
 }
 
-fn json_string(value: &str) -> String {
-    let mut out = String::from("\"");
-    for c in value.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => {
-                out.push_str(&format!("\\u{:04x}", u32::from(c)));
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
 
 fn address_matches(addr: &str, pk: &[u8]) -> bool {
     let Ok((hrp, data)) = bech32::decode(addr) else {
@@ -1802,15 +1605,6 @@ fn verify_amino(pk: &[u8], sig_bytes: &[u8], message: &[u8]) -> bool {
     vk.verify_prehash(&hash, &sig).is_ok()
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0xf) as usize] as char);
-    }
-    out
-}
 
 #[cfg(test)]
 mod frame_tests {

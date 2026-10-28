@@ -2,16 +2,40 @@
 name = "cw-orch-kms-penumbra"
 version = "0.1.0"
 edition = "2021"
-description = "Zigner (air-gapped QR) custody backend for Penumbra: plan QR, approval page, signature verification, CustodyService on loopback"
-license = "Apache-2.0"
+description = "Build root for cw-orch-kms Penumbra custody (src/penumbra + src/ui_shared.rs)"
+license = "LGPL-3.0"
 publish = false
+build = "build.rs"
 
-# Standalone: penumbra v2.1.x pins tonic 0.12 / axum 0.7 / prost 0.13, the
-# cw-orchestrator workspace is on tonic 0.14 / axum 0.8. Keeping this crate out
-# of that workspace (own Cargo.lock) avoids a dependency fight.
+# Own root and lock: penumbra v2.1.1 needs crates.io prost 0.13 / tendermint
+# 0.40; the cw-orchestrator workspace patches those to prost-0.14 forks.
 [workspace]
 
+[lib]
+name = "cw_orch_kms_penumbra"
+path = "lib.rs"
+
+[[bin]]
+name = "penumbra-zigner-custody"
+path = "../src/penumbra/bin/penumbra-zigner-custody.rs"
+
+[[example]]
+name = "test_only_fvk"
+path = "examples/test_only_fvk.rs"
+
+[[test]]
+name = "penumbra"
+path = "tests/penumbra.rs"
+
 [dependencies]
+# shared page (ui_shared.rs): same versions as packages/cw-orch-kms
+axum = "=0.8.9"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+raptorq = "1.8.1"
+rand = "0.8"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+# penumbra
 penumbra-sdk-proto = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1", features = ["rpc"] }
 penumbra-sdk-transaction = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
 penumbra-sdk-keys = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
@@ -24,23 +48,15 @@ penumbra-sdk-fee = { git = "https://github.com/penumbra-zone/penumbra", tag = "v
 penumbra-sdk-txhash = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }
 decaf377 = "0.10.1"
 decaf377-rdsa = "0.11"
+tonic012 = { package = "tonic", version = "0.12.3" }
+prost013 = { package = "prost", version = "0.13.4" }
 anyhow = "1"
 hex = "0.4"
-prost = "0.13.4"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tonic = "0.12.3"
-axum = "0.7.9"
-tokio = { version = "1", features = ["full"] }
-qrcode = { version = "0.14", default-features = false, features = ["svg"] }
-raptorq = "1.8.1"
 subtle = "2"
-rand_core = { version = "0.6", features = ["getrandom"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-clap = { version = "4", features = ["derive"] }
 ur = "0.4"
 tokio-stream = { version = "0.1", features = ["net"] }
+clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
 penumbra-sdk-tct = { git = "https://github.com/penumbra-zone/penumbra", tag = "v2.1.1" }

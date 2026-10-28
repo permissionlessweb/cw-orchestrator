@@ -1,52 +1,36 @@
 //! `penumbra.custody.v1.CustodyService` backed by Zigner. Each `Authorize`
-//! call runs the policy, opens the approval page on loopback and blocks until
-//! the phone's signatures verify (or the page refuses / times out).
+//! call runs the policy, puts the plan on the run's page ([`page::Approvals`])
+//! and blocks until the phone's signatures verify (or the page refuses / times
+//! out).
 //! Validator definition/vote signing is not offered.
 
-use crate::{page, policy::Policy, PinnedAccount};
+use super::{page, policy::Policy, PinnedAccount};
 use penumbra_sdk_custody::AuthorizeRequest;
 use penumbra_sdk_proto::custody::v1::{self as pb, custody_service_server::CustodyService};
 use penumbra_sdk_transaction::{AuthorizationData, TransactionPlan};
 use std::{net::SocketAddr, time::Duration};
-use tokio::sync::Mutex;
+use std::sync::Arc;
+use tonic012 as tonic;
 use tonic::{Request, Response, Status};
 
 pub struct ZignerCustody {
     pub account: PinnedAccount,
     pub policy: Policy,
-    /// Where each approval page is served (loopback; port 0 = pick one).
-    pub page_addr: SocketAddr,
+    /// The page the plans appear on (one page per run).
+    pub approvals: Arc<page::Approvals>,
     pub timeout: Duration,
     pub asset_names: Vec<String>,
-    /// Called with each approval page URL (default: printed to stderr).
-    pub on_page: Option<std::sync::Arc<dyn Fn(&str) + Send + Sync>>,
-    /// Called when an approval finishes (verified, refused or timed out).
-    pub on_done: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
-    /// One phone, one approval at a time.
-    lock: Mutex<()>,
 }
 
 impl ZignerCustody {
-    pub fn new(account: PinnedAccount, policy: Policy, page_addr: SocketAddr, timeout: Duration) -> anyhow::Result<Self> {
-        page::check_bind(page_addr)?;
-        Ok(Self { account, policy, page_addr, timeout, asset_names: vec![], on_page: None, on_done: None, lock: Mutex::new(()) })
+    pub fn new(account: PinnedAccount, policy: Policy, approvals: Arc<page::Approvals>, timeout: Duration) -> Self {
+        Self { account, policy, approvals, timeout, asset_names: vec![] }
     }
 
-    /// Library entry point (no gRPC): policy → page → verified AuthorizationData.
+    /// Library entry point (no gRPC): policy, page, verified AuthorizationData.
     pub async fn authorize_plan(&self, plan: &TransactionPlan) -> anyhow::Result<AuthorizationData> {
-        let _g = self.lock.lock().await;
         self.policy.check(plan, &self.account.fvk)?;
-        let r = page::approve(plan, &self.account.fvk, self.asset_names.clone(), self.page_addr, self.timeout, |url, s| {
-            eprintln!("penumbra approval page: {url}\n{}", s.to_text());
-            if let Some(f) = &self.on_page {
-                f(url);
-            }
-        })
-        .await;
-        if let Some(f) = &self.on_done {
-            f();
-        }
-        r
+        self.approvals.approve(plan, &self.account.fvk, self.asset_names.clone(), self.timeout).await
     }
 }
 

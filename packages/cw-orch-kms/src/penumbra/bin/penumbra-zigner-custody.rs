@@ -2,11 +2,15 @@
 //!
 //!   serve      CustodyService gRPC (for a pcli/pclientd patched with a remote
 //!              custody backend, or any CustodyServiceClient)
+//!   session    view+sign session: FVK imported from Zigner, wiped on exit
+//!
+//! Every mode uses one page (`--page`, the shared cw-orch-kms page) for the
+//! phone. Build from packages/cw-orch-kms/penumbra (cargo build --release).
 //!   authorize  one plan file (TransactionPlan proto) → AuthorizationData proto file
 //!   summary    print what a plan does
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use cw_orch_kms_penumbra::{custody, policy::Policy, summary, PinnedAccount};
+use cw_orch_kms_penumbra::penumbra::{custody, page, policy::Policy, session, summary, PinnedAccount};
 use penumbra_sdk_proto::DomainType;
 use penumbra_sdk_transaction::TransactionPlan;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
@@ -53,8 +57,6 @@ enum Cmd {
         node: String,
         #[arg(long, default_value = "127.0.0.1:8742")]
         grpc: SocketAddr,
-        #[arg(long, default_value = "127.0.0.1:8744")]
-        approval_page: SocketAddr,
         #[arg(long, default_value_t = 3600)]
         ttl_secs: u64,
         /// Ephemeral homes + pointer file (`current-home`) live here.
@@ -65,36 +67,32 @@ enum Cmd {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::from_default_env()).init();
     let cli = Cli::parse();
     let policy: Policy = match &cli.policy {
         Some(p) => serde_json::from_slice(&std::fs::read(p)?)?,
         None => Policy::default(),
     };
-    if let Cmd::Session { node, grpc, approval_page, ttl_secs, state_dir } = &cli.cmd {
+    if let Cmd::Session { node, grpc, ttl_secs, state_dir } = &cli.cmd {
         let pinned = cli.expect_address.clone().context("--expect-address (the pinned cold wallet) is required for session")?;
         let state_dir = state_dir.clone().unwrap_or_else(|| std::env::temp_dir().join("cw-orch-kms-penumbra"));
-        let zxing_js = std::env::var("CW_ORCH_KMS_ZXING").ok().and_then(|p| std::fs::read(p).ok());
-        let r = cw_orch_kms_penumbra::session::start(cw_orch_kms_penumbra::session::SessionConfig {
+        let r = session::start(session::SessionConfig {
             pinned_address: pinned,
             policy,
             node_grpc_url: node.clone(),
             page: cli.page,
             custody: *grpc,
-            approval_page: *approval_page,
             ttl: Duration::from_secs(*ttl_secs),
             approval_timeout: Duration::from_secs(cli.timeout_secs),
             state_dir: state_dir.clone(),
-            zxing_js,
         })
         .await?;
-        eprintln!("open {} and scan Zigner's FVK export (session TTL {}s)", r.page_url, ttl_secs);
-        eprintln!("after import:  pcli --home \"$(cat {}/current-home)\" view balance", state_dir.display());
+        println!("open {} and scan Zigner's FVK export (session TTL {}s)", r.page_url, ttl_secs);
+        println!("after import:  pcli --home \"$(cat {}/current-home)\" view balance", state_dir.display());
         return r.done.await?;
     }
     let fvk = std::fs::read_to_string(cli.fvk_file.as_ref().context("--fvk-file required")?).context("reading fvk file")?;
     let account = PinnedAccount::new(&fvk, cli.expect_address.as_deref())?;
-    eprintln!("pinned wallet {}", account.wallet_id());
+    println!("pinned wallet {}", account.wallet_id());
     let read_plan = |p: &PathBuf| -> Result<TransactionPlan> { TransactionPlan::decode(std::fs::read(p)?.as_slice()) };
     match cli.cmd {
         Cmd::Summary { plan } => {
@@ -108,14 +106,22 @@ async fn main() -> Result<()> {
         }
         Cmd::Authorize { plan, out } => {
             let plan = read_plan(&plan)?;
-            let c = custody::ZignerCustody::new(account, policy, cli.page, Duration::from_secs(cli.timeout_secs))?;
-            let data = c.authorize_plan(&plan).await?;
+            let approvals = page::Approvals::new();
+            let (url, stop, srv) = page::serve(cli.page, page::router(approvals.clone(), None, axum::Router::new())).await?;
+            println!("approval page {url}");
+            let c = custody::ZignerCustody::new(account, policy, approvals, Duration::from_secs(cli.timeout_secs));
+            let data = c.authorize_plan(&plan).await;
+            let _ = stop.send(());
+            let _ = srv.await;
+            let data = data?;
             std::fs::write(&out, data.encode_to_vec())?;
-            eprintln!("verified; AuthorizationData written to {}", out.display());
+            println!("ok verified; AuthorizationData written to {}", out.display());
         }
         Cmd::Serve { grpc } => {
-            let c = custody::ZignerCustody::new(account, policy, cli.page, Duration::from_secs(cli.timeout_secs))?;
-            eprintln!("custody gRPC on {grpc}, approval pages on {}", cli.page);
+            let approvals = page::Approvals::new();
+            let (url, _stop, _srv) = page::serve(cli.page, page::router(approvals.clone(), None, axum::Router::new())).await?;
+            let c = custody::ZignerCustody::new(account, policy, approvals, Duration::from_secs(cli.timeout_secs));
+            println!("custody gRPC on {grpc}, approval page {url}");
             custody::serve(c, grpc).await?;
         }
         Cmd::Session { .. } => unreachable!(),

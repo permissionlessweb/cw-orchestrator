@@ -3,8 +3,9 @@ exclude = [
     # TODO: add new after cw-orch-core 2.0.0 as it's breaking, it shouldn't be compatible
     "contracts-ws",
     "test_contracts/compatibility-test",
-    # own workspace: penumbra v2.1 pins tonic 0.12 / axum 0.7
-    "packages/cw-orch-kms-penumbra",
+    # own Cargo root (own lock, no [patch]): penumbra v2.1 is on prost 0.13 /
+    # tendermint 0.40 crates.io; the patches below swap in prost-0.14 forks.
+    "packages/cw-orch-kms/penumbra",
 ]
 members = [
     "cw-orch",

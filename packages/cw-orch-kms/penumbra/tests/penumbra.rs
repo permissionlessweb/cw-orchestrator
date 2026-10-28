@@ -4,11 +4,12 @@
 //! each randomizer with ask.randomize(r)) so the wire formats are exercised
 //! end to end without a phone.
 
-use cw_orch_kms_penumbra::{
+use cw_orch_kms_penumbra::penumbra::{
     auth::{verify_response, ZignerResponse},
     custody::ZignerCustody,
     policy::Policy,
-    qr::{raptor_frames, ZignerRequest},
+    page::{self, Approvals},
+    qr::ZignerRequest,
     summary::summarize,
     PinnedAccount,
 };
@@ -24,8 +25,10 @@ use penumbra_sdk_proto::DomainType;
 use penumbra_sdk_shielded_pool::{Ics20Withdrawal, Note, OutputPlan, SpendPlan};
 use penumbra_sdk_transaction::{ActionPlan, TransactionParameters, TransactionPlan};
 use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use rand_chacha::rand_core::SeedableRng;
+use cw_orch_kms_penumbra::{raptor_frames, zigner_frames};
+use std::{str::FromStr, time::Duration};
+use tonic012 as tonic;
 
 const USER_DEST: &str = "penumbra1gmapdgqxe0s20trdqz0fulurzgk0agyzawp3ymtm4msks4mu9kvhm3ghw3rah3l7g727xuj5vw9jjg596ec2ecprw3hpta05rfx4djrl0y6e4ujj6cvmcf7t93ldcsquzmqf22";
 
@@ -256,7 +259,7 @@ fn big_plan_goes_to_raptor_frames() {
         plan.actions.push(ActionPlan::Spend(spend(&mut rng, fvk, upenumbra(1), 100 + i)));
     }
     let bytes = ZignerRequest::from_plan(&plan, fvk, vec![]).unwrap().encode().unwrap();
-    let frames = cw_orch_kms_penumbra::qr::zigner_frames(&bytes).unwrap();
+    let frames = zigner_frames(&bytes).unwrap();
     assert!(frames.len() > 1, "{} bytes", bytes.len());
     let again = raptor_frames(&bytes, 1000).unwrap();
     // any ceil(len/1000) frames reconstruct the request
@@ -290,24 +293,32 @@ async fn approval_page_and_custody_service_end_to_end() {
     let sk = test_key(7);
     let fvk = sk.full_viewing_key().clone();
     let plan = lp_plan(&fvk);
-    let (url_tx, mut url_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let mut c = ZignerCustody::new(PinnedAccount { fvk: fvk.clone() }, Policy::default(), "127.0.0.1:0".parse().unwrap(), Duration::from_secs(30)).unwrap();
-    c.on_page = Some(Arc::new(move |u: &str| { let _ = url_tx.send(u.to_string()); }));
+    let approvals = Approvals::new();
+    let (url, stop, srv) = page::serve("127.0.0.1:0".parse().unwrap(), page::router(approvals.clone(), None, axum::Router::new())).await.unwrap();
+    let addr = url.trim_start_matches("http://").trim_end_matches('/').to_string();
+    let c = ZignerCustody::new(PinnedAccount { fvk: fvk.clone() }, Policy::default(), approvals, Duration::from_secs(30));
 
+    // the shared page: layout, scanner and zxing from the zafu checkout
+    let (code, page) = http(&addr, "GET", "/", None, "").await;
+    assert_eq!(code, 200);
+    assert!(page.contains("id=\"term-log\"") && page.contains("cwOrchScan") && page.contains("/zxing/index.min.js"));
+    assert!(!page.contains("CW_ORCH_KMS_ZXING"));
+    // zxing is served by the page itself (same vendored file as the Cosmos pages)
+    let (zcode, zjs) = http(&addr, "GET", "/zxing/index.min.js", None, "").await;
+    assert_eq!(zcode, 200);
+    assert!(zjs.contains("text/javascript") && zjs.contains("BrowserQRCodeReader"));
+    let token = page.split("id=\"page-token\">\"").nth(1).unwrap().split('"').next().unwrap().to_string();
     let req = ZignerRequest::from_plan(&plan, &fvk, vec![]).unwrap().encode().unwrap();
+    let (a2, t2) = (addr.clone(), token.clone());
     let phone = tokio::spawn(async move {
-        let url = url_rx.recv().await.unwrap();
-        let addr = url.trim_start_matches("http://").trim_end_matches('/').to_string();
-        let (code, page) = http(&addr, "GET", "/", None, "").await;
-        assert_eq!(code, 200);
-        assert!(page.contains("LP open") && page.contains("<svg"));
-        let token = page.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+        let view = wait_approval(&a2, &t2).await;
+        assert!(view.contains("LP open") && view.contains("<svg"));
         // no token → refused
-        assert_eq!(http(&addr, "POST", "/response", None, "00").await.0, 403);
-        // garbage → 400, session stays open
-        assert_eq!(http(&addr, "POST", "/response", Some(&token), "abcd").await.0, 400);
+        assert_eq!(http(&a2, "POST", "/response", None, "00").await.0, 403);
+        // garbage → 400, approval stays open
+        assert_eq!(http(&a2, "POST", "/response", Some(&t2), "abcd").await.0, 400);
         let hexresp = zigner_sign(&req, &sk).unwrap();
-        let (code, body) = http(&addr, "POST", "/response", Some(&token), &hexresp).await;
+        let (code, body) = http(&a2, "POST", "/response", Some(&t2), &hexresp).await;
         assert_eq!(code, 200, "{body}");
     });
     let resp = c
@@ -318,32 +329,42 @@ async fn approval_page_and_custody_service_end_to_end() {
     phone.await.unwrap();
     let data = penumbra_sdk_transaction::AuthorizationData::try_from(resp.data.unwrap()).unwrap();
     assert_eq!(data.effect_hash.unwrap(), plan.effect_hash(&fvk).unwrap());
+    assert_eq!(http(&addr, "GET", "/approval", Some(&token), "").await.1.rsplit("\r\n\r\n").next().unwrap(), "null");
 
     // refuse path
     let plan2 = ics20_plan(&fvk);
-    let (url_tx, mut url_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    c.on_page = Some(Arc::new(move |u: &str| { let _ = url_tx.send(u.to_string()); }));
+    let (a3, t3) = (addr.clone(), token.clone());
     let refuser = tokio::spawn(async move {
-        let url = url_rx.recv().await.unwrap();
-        let addr = url.trim_start_matches("http://").trim_end_matches('/').to_string();
-        let (_, page) = http(&addr, "GET", "/", None, "").await;
-        let token = page.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
-        http(&addr, "POST", "/refuse", Some(&token), "").await;
+        wait_approval(&a3, &t3).await;
+        http(&a3, "POST", "/refuse", Some(&t3), "").await;
     });
     let e = c.authorize_plan(&plan2).await.unwrap_err();
     refuser.await.unwrap();
     assert!(e.to_string().contains("refused"));
+    let _ = stop.send(());
+    let _ = srv.await;
+}
+
+async fn wait_approval(addr: &str, token: &str) -> String {
+    loop {
+        let (_, s) = http(addr, "GET", "/approval", Some(token), "").await;
+        let body = s.rsplit("\r\n\r\n").next().unwrap_or("").to_string();
+        if body != "null" && body.contains("\"frames\"") {
+            return body;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 #[test]
 fn page_refuses_non_loopback_and_reserved_port() {
-    assert!(cw_orch_kms_penumbra::page::check_bind("0.0.0.0:8743".parse().unwrap()).is_err());
-    assert!(cw_orch_kms_penumbra::page::check_bind("127.0.0.1:8741".parse().unwrap()).is_err());
-    assert!(cw_orch_kms_penumbra::page::check_bind("127.0.0.1:8743".parse().unwrap()).is_ok());
+    assert!(page::check_bind("0.0.0.0:8743".parse().unwrap()).is_err());
+    assert!(page::check_bind("127.0.0.1:8741".parse().unwrap()).is_err());
+    assert!(page::check_bind("127.0.0.1:8743".parse().unwrap()).is_ok());
 }
 
 // ---------------- cold-wallet view session ----------------
-use cw_orch_kms_penumbra::session;
+use cw_orch_kms_penumbra::penumbra::session;
 
 fn zigner_fvk_binary(fvk: &FullViewingKey) -> Vec<u8> {
     // Zigner FvkExportData::encode_qr: 53 03 01 | acct u32LE | label | fvk64 | wallet_id32 | 01 zid32
@@ -444,17 +465,15 @@ async fn view_session_import_sign_end_wipe() {
         node_grpc_url: "https://node.example".into(),
         page: "127.0.0.1:0".parse().unwrap(),
         custody: format!("127.0.0.1:{custody_port}").parse().unwrap(),
-        approval_page: "127.0.0.1:0".parse().unwrap(),
         ttl: Duration::from_secs(60),
         approval_timeout: Duration::from_secs(30),
         state_dir: state.clone(),
-        zxing_js: None,
     })
     .await
     .unwrap();
     let page = r.page_url.trim_start_matches("http://").trim_end_matches('/').to_string();
     let (_, html) = http(&page, "GET", "/", None, "").await;
-    let tok = html.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+    let tok = html.split("id=\"page-token\">\"").nth(1).unwrap().split('"').next().unwrap().to_string();
     assert!(html.contains(&me));
     // no token / wrong wallet
     assert_eq!(http(&page, "POST", "/fvk", None, "x").await.0, 403);
@@ -486,15 +505,11 @@ async fn view_session_import_sign_end_wipe() {
     let req = ZignerRequest::from_plan(&plan, &fvk, vec![]).unwrap().encode().unwrap();
     let (p2, t2) = (page.clone(), tok.clone());
     let phone = tokio::spawn(async move {
-        let url = loop {
-            let (_, s) = http(&p2, "GET", "/status", Some(&t2), "").await;
-            if let Some(u) = s.split("\"pending_approval\":\"").nth(1) { break u.split('"').next().unwrap().to_string(); }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        };
-        let a = url.trim_start_matches("http://").trim_end_matches('/').to_string();
-        let (_, pg) = http(&a, "GET", "/", None, "").await;
-        let at = pg.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
-        let (c, b) = http(&a, "POST", "/response", Some(&at), &zigner_sign(&req, &sk).unwrap()).await;
+        // the plan appears on the same session page
+        let (_, st) = http(&p2, "GET", "/status", Some(&t2), "").await;
+        assert!(st.contains("\"pending_approval\""));
+        wait_approval(&p2, &t2).await;
+        let (c, b) = http(&p2, "POST", "/response", Some(&t2), &zigner_sign(&req, &sk).unwrap()).await;
         assert_eq!(c, 200, "{b}");
     });
     let resp = client
@@ -521,7 +536,7 @@ fn wallet_template_policy_covers_wallet_actions() {
         assert!(p.allowed_actions.iter().any(|x| x == a));
     }
     assert!(!p.allowed_actions.iter().any(|x| x == "delegator_vote" || x == "unsupported"));
-    let shipped: Policy = serde_json::from_str(include_str!("../config/penumbra-1.policy.json")).unwrap();
+    let shipped: Policy = serde_json::from_str(include_str!("../../config/penumbra/penumbra-1.policy.json")).unwrap();
     assert_eq!(shipped.allowed_actions, p.allowed_actions);
     assert_eq!(shipped.allowed_output_addresses, vec![USER_DEST.to_string()]);
     assert_eq!(shipped.chain_id, "penumbra-1");

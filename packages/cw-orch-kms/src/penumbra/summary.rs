@@ -83,7 +83,7 @@ pub fn summarize(plan: &TransactionPlan, fvk: &FullViewingKey) -> Summary {
                 fmt_value(&Value { amount: w.reserves.r2, asset_id: w.pair.asset_2() }, &cache),
             ),
             other => {
-                let l = format!("other action: {}", crate::policy::kind(other));
+                let l = format!("other action: {}", super::policy::kind(other));
                 warnings.push(l.clone());
                 l
             }

@@ -14,7 +14,8 @@
 //!
 //! Zigner re-decodes the plan, recomputes the effect hash with its own FVK and
 //! refuses to sign on mismatch, so the hash we put here is only a hint; what it
-//! signs is what the plan says.
+//! signs is what the plan says. Frames and QR rendering are the shared
+//! [`crate::ui_shared::zigner_frames`] / [`crate::ui_shared::raptor_frames`].
 
 use anyhow::{bail, ensure, Context, Result};
 use penumbra_sdk_keys::FullViewingKey;
@@ -22,9 +23,6 @@ use penumbra_sdk_proto::DomainType;
 use penumbra_sdk_transaction::TransactionPlan;
 
 pub const PRELUDE: [u8; 3] = [0x53, 0x03, 0x10];
-/// Raptorq symbol size per animated frame (same as cw-orch-kms).
-pub const ZIGNER_FRAME_BYTES: u16 = 1000;
-const QR_MAX_BYTES: usize = 2953;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ZignerRequest {
@@ -134,38 +132,5 @@ impl<'a> Cursor<'a> {
     }
     fn u8(&mut self) -> Result<u8> {
         Ok(self.take(1)?[0])
-    }
-}
-
-/// The codes the phone scans: one plain code when the request fits,
-/// otherwise Zigner's raptorq fountain frames.
-pub fn zigner_frames(request: &[u8]) -> Result<Vec<Vec<u8>>> {
-    if qrcode::QrCode::with_error_correction_level(request, qrcode::EcLevel::L).is_ok() && request.len() <= QR_MAX_BYTES {
-        return Ok(vec![request.to_vec()]);
-    }
-    raptor_frames(request, ZIGNER_FRAME_BYTES)
-}
-
-/// Zigner's multi-frame format (copied from cw-orch-kms `raptor_frames`):
-/// 4-byte BE header (top bit set | total length) + serialized raptorq packet.
-pub fn raptor_frames(input: &[u8], chunk: u16) -> Result<Vec<Vec<u8>>> {
-    ensure!(!input.is_empty(), "empty request");
-    ensure!(input.len() < 0x8000_0000 && chunk > 0, "request too long");
-    let head = (input.len() as u32 + 0x8000_0000).to_be_bytes();
-    let repair = if input.len() as u32 <= chunk as u32 { 0 } else { input.len() as u32 / chunk as u32 };
-    let encoder = raptorq::Encoder::with_defaults(input, chunk);
-    let frames: Vec<Vec<u8>> = encoder
-        .get_encoded_packets(repair)
-        .iter()
-        .map(|p| [head.to_vec(), p.serialize()].concat())
-        .collect();
-    ensure!(frames.iter().all(|f| f.len() <= QR_MAX_BYTES), "frame too large for one code");
-    Ok(frames)
-}
-
-pub fn frame_svg(data: &[u8]) -> String {
-    match qrcode::QrCode::with_error_correction_level(data, qrcode::EcLevel::L) {
-        Ok(code) => code.render::<qrcode::render::svg::Color<'_>>().min_dimensions(320, 320).build(),
-        Err(_) => "<p>frame does not fit in one code</p>".into(),
     }
 }
