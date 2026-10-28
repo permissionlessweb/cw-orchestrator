@@ -1,0 +1,8 @@
+{
+  "chain_id": "penumbra-1",
+  "allowed_actions": ["spend", "output", "ics20_withdrawal", "position_open", "position_close", "position_withdraw",
+                      "swap", "swap_claim", "delegate", "undelegate", "undelegate_claim"],
+  "allowed_output_addresses": ["penumbra1gmapdgqxe0s20trdqz0fulurzgk0agyzawp3ymtm4msks4mu9kvhm3ghw3rah3l7g727xuj5vw9jjg596ec2ecprw3hpta05rfx4djrl0y6e4ujj6cvmcf7t93ldcsquzmqf22"],
+  "allowed_ics20_receivers": [],
+  "allowed_ics20_channels": []
+}
