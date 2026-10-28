@@ -22,6 +22,7 @@ pub mod custody;
 pub mod page;
 pub mod policy;
 pub mod qr;
+pub mod session;
 pub mod summary;
 
 pub use penumbra_sdk_transaction::{AuthorizationData, TransactionPlan};

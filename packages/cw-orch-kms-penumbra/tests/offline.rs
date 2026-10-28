@@ -341,3 +341,188 @@ fn page_refuses_non_loopback_and_reserved_port() {
     assert!(cw_orch_kms_penumbra::page::check_bind("127.0.0.1:8741".parse().unwrap()).is_err());
     assert!(cw_orch_kms_penumbra::page::check_bind("127.0.0.1:8743".parse().unwrap()).is_ok());
 }
+
+// ---------------- cold-wallet view session ----------------
+use cw_orch_kms_penumbra::session;
+
+fn zigner_fvk_binary(fvk: &FullViewingKey) -> Vec<u8> {
+    // Zigner FvkExportData::encode_qr: 53 03 01 | acct u32LE | label | fvk64 | wallet_id32 | 01 zid32
+    let mut b = vec![0x53, 0x03, 0x01];
+    b.extend_from_slice(&0u32.to_le_bytes());
+    b.push(4);
+    b.extend_from_slice(b"cold");
+    let inner = penumbra_sdk_proto::core::keys::v1::FullViewingKey::from(fvk.clone()).inner;
+    b.extend_from_slice(&inner);
+    b.extend_from_slice(&fvk.wallet_id().0);
+    b.push(0x01);
+    b.extend_from_slice(&[9u8; 32]);
+    b
+}
+
+fn zigner_fvk_ur(fvk: &FullViewingKey) -> Vec<u8> {
+    // CBOR as Zigner builds it: {1: wallet_id, 2: [#49302({1: fvk_str, 2: 0})]}
+    let s = fvk.to_string();
+    let mut c = vec![0xa2, 0x01, 0x58, 0x20];
+    c.extend_from_slice(&fvk.wallet_id().0);
+    c.extend_from_slice(&[0x02, 0x81, 0xd9, 0xc0, 0x96, 0xa2, 0x01, 0x78, s.len() as u8]);
+    c.extend_from_slice(s.as_bytes());
+    c.extend_from_slice(&[0x02, 0x00]);
+    c
+}
+
+#[test]
+fn fvk_export_formats_and_pinning() {
+    let fvk = test_key(7).full_viewing_key().clone();
+    let me = fvk.payment_address(0u32.into()).0;
+    let bin = zigner_fvk_binary(&fvk);
+    for input in [
+        fvk.to_string().into_bytes(),
+        bin.clone(),
+        hex::encode(&bin).into_bytes(),
+        bin.iter().map(|&b| b as char).collect::<String>().into_bytes(), // zxing latin-1
+        ur::ur::encode(&zigner_fvk_ur(&fvk), &ur::Type::Custom("penumbra-accounts")).into_bytes(),
+    ] {
+        let got = session::parse_fvk_export(&input).unwrap();
+        assert_eq!(got, fvk);
+        assert!(session::pin(got, &me).is_ok());
+    }
+    // multi-part UR
+    let mut enc = ur::Encoder::new(&zigner_fvk_ur(&fvk), 60, "penumbra-accounts").unwrap();
+    let mut col = session::UrCollector::default();
+    let mut got = None;
+    for _ in 0..50 {
+        if let Some(f) = col.receive(&enc.next_part().unwrap()).unwrap() { got = Some(f); break; }
+    }
+    assert_eq!(got.unwrap(), fvk);
+    // tampered wallet id
+    let mut bad = bin.clone();
+    bad[3 + 4 + 1 + 4 + 64] ^= 1;
+    assert!(session::parse_fvk_export(&bad).is_err());
+    // other wallet's FVK never pins to the user's cold address
+    let user = Address::from_str(USER_DEST).unwrap();
+    let e = session::pin(fvk.clone(), &user).unwrap_err().to_string();
+    assert!(!e.contains(&fvk.to_string()), "error must not echo the FVK");
+}
+
+#[test]
+fn session_home_is_remote_custody_only_and_wipes() {
+    let fvk = test_key(7).full_viewing_key().clone();
+    let d = std::env::temp_dir().join(format!("pzc-test-{}", std::process::id()));
+    let home = d.join("home");
+    session::write_pcli_home(&home, &fvk, "https://node.example", "127.0.0.1:8742".parse().unwrap()).unwrap();
+    let cfg = std::fs::read_to_string(home.join("config.toml")).unwrap();
+    assert!(cfg.contains("backend = \"Remote\"") && cfg.contains("grpc_url = \"http://127.0.0.1:8742/\""));
+    for bad in ["SoftKms", "spend_key", "Encrypted", "Threshold", "governance_custody"] {
+        assert!(!cfg.contains(bad));
+    }
+    use std::os::unix::fs::PermissionsExt;
+    assert_eq!(std::fs::metadata(&home).unwrap().permissions().mode() & 0o777, 0o700);
+    assert_eq!(std::fs::metadata(home.join("config.toml")).unwrap().permissions().mode() & 0o777, 0o600);
+    assert!(session::write_pcli_home(&d.join("h2"), &fvk, "x", "10.0.0.1:8742".parse().unwrap()).is_err());
+    assert!(session::write_pcli_home(&d.join("h3"), &fvk, "x\"\n[custody]", "127.0.0.1:8742".parse().unwrap()).is_err());
+    std::fs::write(home.join("pcli-view.sqlite"), vec![1u8; 100_000]).unwrap();
+    session::wipe(&home).unwrap();
+    assert!(!home.exists());
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+fn free_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port()
+}
+
+#[tokio::test]
+async fn view_session_import_sign_end_wipe() {
+    use penumbra_sdk_proto::custody::v1::{self as pb, custody_service_client::CustodyServiceClient};
+    let sk = test_key(7);
+    let fvk = sk.full_viewing_key().clone();
+    let me = fvk.payment_address(0u32.into()).0.to_string();
+    let state = std::env::temp_dir().join(format!("pzc-sess-{}", std::process::id()));
+    let custody_port = free_port();
+    let r = session::start(session::SessionConfig {
+        pinned_address: me.clone(),
+        policy: Policy::wallet_template("penumbra-1", vec![]),
+        node_grpc_url: "https://node.example".into(),
+        page: "127.0.0.1:0".parse().unwrap(),
+        custody: format!("127.0.0.1:{custody_port}").parse().unwrap(),
+        approval_page: "127.0.0.1:0".parse().unwrap(),
+        ttl: Duration::from_secs(60),
+        approval_timeout: Duration::from_secs(30),
+        state_dir: state.clone(),
+        zxing_js: None,
+    })
+    .await
+    .unwrap();
+    let page = r.page_url.trim_start_matches("http://").trim_end_matches('/').to_string();
+    let (_, html) = http(&page, "GET", "/", None, "").await;
+    let tok = html.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+    assert!(html.contains(&me));
+    // no token / wrong wallet
+    assert_eq!(http(&page, "POST", "/fvk", None, "x").await.0, 403);
+    let other = test_key(8).full_viewing_key().to_string();
+    let (c, body) = http(&page, "POST", "/fvk", Some(&tok), &other).await;
+    assert_eq!(c, 400);
+    assert!(!body.contains(&other));
+    // Zigner binary export as the page sends it (hex)
+    let (c, b) = http(&page, "POST", "/fvk", Some(&tok), &hex::encode(zigner_fvk_binary(&fvk))).await;
+    assert_eq!(c, 200, "{b}");
+    // wait for active
+    let mut home = String::new();
+    for _ in 0..50 {
+        let (_, s) = http(&page, "GET", "/status", Some(&tok), "").await;
+        if s.contains("\"state\":\"active\"") {
+            home = s.split("\"home\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+            assert!(!s.contains("penumbrafullviewingkey"), "status must not leak FVK");
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(std::path::Path::new(&home).join("config.toml").exists());
+    assert_eq!(std::fs::read_to_string(state.join("current-home")).unwrap(), home);
+
+    // pcli-side: custody over loopback gRPC
+    let mut client = CustodyServiceClient::connect(format!("http://127.0.0.1:{custody_port}")).await.unwrap();
+    assert!(client.export_full_viewing_key(pb::ExportFullViewingKeyRequest {}).await.is_err());
+    let plan = ics20_plan(&fvk);
+    let req = ZignerRequest::from_plan(&plan, &fvk, vec![]).unwrap().encode().unwrap();
+    let (p2, t2) = (page.clone(), tok.clone());
+    let phone = tokio::spawn(async move {
+        let url = loop {
+            let (_, s) = http(&p2, "GET", "/status", Some(&t2), "").await;
+            if let Some(u) = s.split("\"pending_approval\":\"").nth(1) { break u.split('"').next().unwrap().to_string(); }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        };
+        let a = url.trim_start_matches("http://").trim_end_matches('/').to_string();
+        let (_, pg) = http(&a, "GET", "/", None, "").await;
+        let at = pg.split("const T=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+        let (c, b) = http(&a, "POST", "/response", Some(&at), &zigner_sign(&req, &sk).unwrap()).await;
+        assert_eq!(c, 200, "{b}");
+    });
+    let resp = client
+        .authorize(pb::AuthorizeRequest { plan: Some(plan.clone().into()), pre_authorizations: vec![] })
+        .await
+        .unwrap()
+        .into_inner();
+    phone.await.unwrap();
+    let data = penumbra_sdk_transaction::AuthorizationData::try_from(resp.data.unwrap()).unwrap();
+    assert_eq!(data.effect_hash.unwrap(), plan.effect_hash(&fvk).unwrap());
+
+    // end → wiped
+    assert_eq!(http(&page, "POST", "/end", Some(&tok), "").await.0, 200);
+    r.done.await.unwrap().unwrap();
+    assert!(!std::path::Path::new(&home).exists());
+    assert!(!state.join("current-home").exists());
+    let _ = std::fs::remove_dir_all(&state);
+}
+
+#[test]
+fn wallet_template_policy_covers_wallet_actions() {
+    let p = Policy::wallet_template("penumbra-1", vec![USER_DEST.into()]);
+    for a in ["spend", "output", "ics20_withdrawal", "position_open", "position_close", "position_withdraw", "swap", "swap_claim", "delegate", "undelegate", "undelegate_claim"] {
+        assert!(p.allowed_actions.iter().any(|x| x == a));
+    }
+    assert!(!p.allowed_actions.iter().any(|x| x == "delegator_vote" || x == "unsupported"));
+    let shipped: Policy = serde_json::from_str(include_str!("../config/penumbra-1.policy.json")).unwrap();
+    assert_eq!(shipped.allowed_actions, p.allowed_actions);
+    assert_eq!(shipped.allowed_output_addresses, vec![USER_DEST.to_string()]);
+    assert_eq!(shipped.chain_id, "penumbra-1");
+}

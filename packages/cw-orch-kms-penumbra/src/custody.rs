@@ -20,6 +20,8 @@ pub struct ZignerCustody {
     pub asset_names: Vec<String>,
     /// Called with each approval page URL (default: printed to stderr).
     pub on_page: Option<std::sync::Arc<dyn Fn(&str) + Send + Sync>>,
+    /// Called when an approval finishes (verified, refused or timed out).
+    pub on_done: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
     /// One phone, one approval at a time.
     lock: Mutex<()>,
 }
@@ -27,20 +29,24 @@ pub struct ZignerCustody {
 impl ZignerCustody {
     pub fn new(account: PinnedAccount, policy: Policy, page_addr: SocketAddr, timeout: Duration) -> anyhow::Result<Self> {
         page::check_bind(page_addr)?;
-        Ok(Self { account, policy, page_addr, timeout, asset_names: vec![], on_page: None, lock: Mutex::new(()) })
+        Ok(Self { account, policy, page_addr, timeout, asset_names: vec![], on_page: None, on_done: None, lock: Mutex::new(()) })
     }
 
     /// Library entry point (no gRPC): policy → page → verified AuthorizationData.
     pub async fn authorize_plan(&self, plan: &TransactionPlan) -> anyhow::Result<AuthorizationData> {
         let _g = self.lock.lock().await;
         self.policy.check(plan, &self.account.fvk)?;
-        page::approve(plan, &self.account.fvk, self.asset_names.clone(), self.page_addr, self.timeout, |url, s| {
+        let r = page::approve(plan, &self.account.fvk, self.asset_names.clone(), self.page_addr, self.timeout, |url, s| {
             eprintln!("penumbra approval page: {url}\n{}", s.to_text());
             if let Some(f) = &self.on_page {
                 f(url);
             }
         })
-        .await
+        .await;
+        if let Some(f) = &self.on_done {
+            f();
+        }
+        r
     }
 }
 
@@ -70,7 +76,8 @@ impl CustodyService for ZignerCustody {
         &self,
         _r: Request<pb::ExportFullViewingKeyRequest>,
     ) -> Result<Response<pb::ExportFullViewingKeyResponse>, Status> {
-        Ok(Response::new(pb::ExportFullViewingKeyResponse { full_viewing_key: Some(self.account.fvk.clone().into()) }))
+        // The FVK is session-scoped confidential data: never hand it out over gRPC.
+        Err(Status::permission_denied("zigner custody does not export the full viewing key"))
     }
 
     async fn confirm_address(&self, request: Request<pb::ConfirmAddressRequest>) -> Result<Response<pb::ConfirmAddressResponse>, Status> {
@@ -92,6 +99,18 @@ pub async fn serve(custody: ZignerCustody, grpc_addr: SocketAddr) -> anyhow::Res
     tonic::transport::Server::builder()
         .add_service(pb::custody_service_server::CustodyServiceServer::new(custody))
         .serve(grpc_addr)
+        .await?;
+    Ok(())
+}
+
+/// Serve on an already-bound loopback listener (lets callers pick port 0).
+pub async fn serve_listener(custody: ZignerCustody, listener: tokio::net::TcpListener) -> anyhow::Result<()> {
+    let a = listener.local_addr()?;
+    anyhow::ensure!(a.ip().is_loopback(), "custody gRPC binds loopback only");
+    anyhow::ensure!(a.port() != page::RESERVED_PORT, "port {} is reserved", page::RESERVED_PORT);
+    tonic::transport::Server::builder()
+        .add_service(pb::custody_service_server::CustodyServiceServer::new(custody))
+        .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
         .await?;
     Ok(())
 }

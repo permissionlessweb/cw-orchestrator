@@ -1,0 +1,8 @@
+#!/bin/sh
+# pcli against the live cold-wallet session home (refuses if none / not Remote custody).
+set -eu
+ptr="${PZC_STATE_DIR:-${HOME}/.cw-orch-kms/penumbra}/current-home"
+[ -f "$ptr" ] || { echo "no active view session (run scripts/penumbra-cold-session.sh)" >&2; exit 1; }
+home=$(cat "$ptr")
+grep -q '^backend = "Remote"$' "$home/config.toml" || { echo "session home is not Remote custody; refusing" >&2; exit 1; }
+PCLI_REQUIRE_REMOTE_CUSTODY=1 exec "${PCLI_BIN:-pcli}" --home "$home" "$@"

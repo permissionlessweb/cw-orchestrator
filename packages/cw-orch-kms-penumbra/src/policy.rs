@@ -57,6 +57,23 @@ impl Default for Policy {
 }
 
 impl Policy {
+    /// Everything a cold wallet does day to day (opt-in beyond the default):
+    /// transfers, ICS20 out, LP, swaps, staking. No governance/validator actions.
+    pub fn wallet_template(chain_id: &str, allowed_outputs: Vec<String>) -> Self {
+        Self {
+            chain_id: chain_id.into(),
+            allowed_actions: [
+                "spend", "output", "ics20_withdrawal", "position_open", "position_close", "position_withdraw",
+                "swap", "swap_claim", "delegate", "undelegate", "undelegate_claim",
+            ]
+            .map(String::from)
+            .to_vec(),
+            allowed_output_addresses: allowed_outputs,
+            allowed_ics20_receivers: vec![],
+            allowed_ics20_channels: vec![],
+        }
+    }
+
     pub fn check(&self, plan: &TransactionPlan, fvk: &FullViewingKey) -> Result<()> {
         if !self.chain_id.is_empty() && plan.transaction_parameters.chain_id != self.chain_id {
             bail!("plan is for chain {:?}, policy expects {:?}", plan.transaction_parameters.chain_id, self.chain_id);
@@ -92,6 +109,11 @@ impl Policy {
                     let ch = w.source_channel.to_string();
                     if !self.allowed_ics20_channels.is_empty() && !self.allowed_ics20_channels.contains(&ch) {
                         bail!("ics20 channel {ch} not allow-listed");
+                    }
+                }
+                ActionPlan::Swap(sw) => {
+                    if fvk.address_index(&sw.swap_plaintext.claim_address).is_none() {
+                        bail!("swap claim address is not ours");
                     }
                 }
                 _ => {}
