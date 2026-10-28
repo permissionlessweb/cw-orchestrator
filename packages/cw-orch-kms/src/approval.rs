@@ -281,7 +281,19 @@ impl AuthzSession {
         let msgs = revoke_exec_anys(&self.granter, &self.grantee, &self.type_urls)?;
         let handle = self.daemon.rt_handle.clone();
         let sender = self.daemon.sender();
-        let commit = handle.block_on(sender.commit_tx_any(msgs, Some("cw-orch session revoke")));
+        let mut attempt = 0;
+        let commit = loop {
+            attempt += 1;
+            let c = handle.block_on(sender.commit_tx_any(msgs.clone(), Some("cw-orch session revoke")));
+            match &c {
+                Err(e) if is_height_race(&e.to_string()) && attempt < HEIGHT_RACE_TRIES => {
+                    // Rejected at CheckTx, so nothing is in the mempool; the rebuilt tx reuses the sequence.
+                    println!("session revoke: invalid-height race (sdk code 26), retry {attempt}/{}", HEIGHT_RACE_TRIES - 1);
+                    std::thread::sleep(HEIGHT_RACE_BACKOFF);
+                }
+                _ => break c,
+            }
+        };
         if let Err(err) = commit {
             if let Some(page) = &self.page {
                 page.note(&format!("err session revoke refused: {err}"));
@@ -803,6 +815,19 @@ async fn approve_grant(session: &ApprovalSession, tx: &SetupTx) -> Result<Signed
     }
 }
 
+/// Bounded retry for CheckTx racing a commit (sdk code 26 "invalid height").
+const HEIGHT_RACE_TRIES: u32 = 3;
+const HEIGHT_RACE_BACKOFF: std::time::Duration = std::time::Duration::from_millis(2500);
+
+fn is_height_race(s: &str) -> bool {
+    s.contains("invalid height") && s.contains("26")
+}
+
+async fn tx_on_chain(daemon: &Daemon, hash: &str) -> bool {
+    let mut client = cosmrs::proto::cosmos::tx::v1beta1::service_client::ServiceClient::new(daemon.sender().channel());
+    client.get_tx(cosmrs::proto::cosmos::tx::v1beta1::GetTxRequest { hash: hash.into() }).await.is_ok()
+}
+
 async fn broadcast_grant(
     daemon: &Daemon,
     granter: &str,
@@ -811,11 +836,32 @@ async fn broadcast_grant(
     setup: &SetupChain,
 ) -> Result<String, String> {
     let raw = legacy_amino_raw(granter, signed, tx, setup)?;
-    let response = daemon
-        .sender()
-        .broadcast_tx(raw)
-        .await
-        .map_err(|err| format!("grant broadcast refused: {err}"))?;
+    let bytes = raw.to_bytes().map_err(|e| format!("grant encode: {e}"))?;
+    let hash = {
+        use sha2::Digest;
+        sha2::Sha256::digest(&bytes).iter().map(|b| format!("{b:02X}")).collect::<String>()
+    };
+    let mut attempt = 0;
+    let response = loop {
+        attempt += 1;
+        let raw: cosmrs::proto::cosmos::tx::v1beta1::TxRaw = prost::Message::decode(bytes.as_slice()).map_err(|e| format!("grant decode: {e}"))?;
+        let res = daemon.sender().broadcast_tx(raw.into()).await.map_err(|err| format!("{err}"));
+        let race = match &res {
+            Err(e) => is_height_race(e),
+            Ok(r) => r.code != 0 && is_height_race(&r.raw_log),
+        };
+        if !race || attempt >= HEIGHT_RACE_TRIES {
+            break res.map_err(|err| format!("grant broadcast refused: {err}"))?;
+        }
+        // CheckTx hit a commit boundary. The same signed bytes are retried only
+        // after confirming they are not already on chain.
+        tokio::time::sleep(HEIGHT_RACE_BACKOFF).await;
+        if tx_on_chain(daemon, &hash).await {
+            println!("session grant {hash} (already on chain after a height race)");
+            break cosmrs::proto::cosmos::base::abci::v1beta1::TxResponse { txhash: hash.clone(), ..Default::default() };
+        }
+        println!("grant broadcast: invalid-height race (sdk code 26), retry {attempt}/{}", HEIGHT_RACE_TRIES - 1);
+    };
     if response.code != 0 {
         return Err(format!(
             "grant broadcast refused: code {} {}",
@@ -1165,6 +1211,16 @@ async fn query_allowance(
         denom: coin.map(|coin| coin.denom.clone()).unwrap_or_default(),
         limit: coin.and_then(|coin| coin.amount.parse().ok()),
     }))
+}
+
+#[cfg(test)]
+mod height_race_tests {
+    #[test]
+    fn detects_only_code_26_invalid_height() {
+        assert!(super::is_height_race("codespace sdk code 26: invalid height: context did not contain latest block height in either check state or finalize block state (24144875)"));
+        assert!(!super::is_height_race("codespace sdk code 32: account sequence mismatch"));
+        assert!(!super::is_height_race("authorization not found"));
+    }
 }
 
 #[cfg(test)]
