@@ -17,7 +17,7 @@ exclude = [".env"]
 all-features = true
 
 [features]
-default = ["zk"]
+default = [] # zk is opt-in; default pulls wasmer-types sha2 ^0.11
 eth     = ["dep:snailquote"]
 terp    = []
 zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm", "terp"]
