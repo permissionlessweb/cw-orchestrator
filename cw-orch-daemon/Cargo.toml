@@ -84,7 +84,7 @@ toml       = "0.8"
 cw20 = { package = "cw20", version = "3.0.0" }
 cw20-base = { package = "cw20-base", version = "3.0.0" }
 
-cosmwasm-schema = { package = "cosmwasm-schema", version = "=4.0.0-zk" }
+cosmwasm-schema = { package = "cosmwasm-schema", version = "=4.1.0" }
 ctor            = "0.2.8"
 cw-orch = { path = "../cw-orch" }
 cw-orch-daemon = { path = "." }

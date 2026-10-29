@@ -37,7 +37,7 @@ default = []
 zk = ["cosmwasm-std/zk", "dep:zk-cosmwasm"]
 
 [workspace.dependencies]
-cosmwasm-std = { package = "cosmwasm-std", version = "=4.0.0-zk" }
+cosmwasm-std = { package = "cosmwasm-std", version = "=4.1.0" }
 cw-storage-plus = { version = "3.0.1" }
 
 clone-cw-multi-test = { package = "cw-multi-test", version = "=3.0.0-rc", features = ["cosmwasm_3_0"] }
@@ -58,7 +58,7 @@ simple-ica-host = { package = "simple-ica-host", version = "0.3.0" }
 tendermint = { package = "tendermint", version = "0.40.4" }
 tendermint-proto = { package = "tendermint-proto", version = "0.40.4" }
 tendermint-rpc = { package = "tendermint-rpc", version = "0.40.4" }
-zk-cosmwasm = { package = "zk-cosmwasm", version = "=4.0.0-zk" }
+zk-cosmwasm = { package = "zk-cosmwasm", version = "=4.1.0" }
 
 anyhow = "1.0"
 serde  = { version = "1.0.208", default-features = false, features = ["derive"] }

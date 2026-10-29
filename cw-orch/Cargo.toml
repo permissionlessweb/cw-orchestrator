@@ -62,7 +62,7 @@ tokio            = { workspace = true, features = ["full"], optional = true }
 tonic = { workspace = true, optional = true, features = ["transport"] }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "=4.0.0-zk" }
+cosmwasm-schema = { version = "=4.1.0" }
 counter-contract  = { path = "../contracts-ws/contracts/counter" }
 cw-orch = { path = "." }
 dotenv            = "0.15.0"
