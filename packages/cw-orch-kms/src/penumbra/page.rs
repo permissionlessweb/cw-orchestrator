@@ -219,14 +219,18 @@ pub fn router(approvals: Arc<Approvals>, session_card: Option<&str>, extra: Rout
         .layer(middleware::from_fn(ui_shared::isolate))
 }
 
-/// Bind `addr` (loopback, not 8741) and serve `app` until `stop` fires.
+/// Bind `addr` (loopback, not 8741; a taken 18700-18999 port is re-picked)
+/// and serve `app` until `stop` fires. Prints the URL and the tunnel line.
 pub async fn serve(
     addr: SocketAddr,
     app: Router,
 ) -> Result<(String, oneshot::Sender<()>, tokio::task::JoinHandle<()>)> {
     check_bind(addr)?;
-    let listener = tokio::net::TcpListener::bind(addr).await.with_context(|| format!("binding {addr}"))?;
-    let url = format!("http://{}/", listener.local_addr()?);
+    let listener = crate::port::bind_loopback_quiet(addr).await.map_err(anyhow::Error::msg).with_context(|| format!("binding {addr}"))?;
+    let bound = listener.local_addr()?;
+    check_bind(bound)?;
+    crate::port::announce("penumbra page", bound);
+    let url = format!("http://{bound}/");
     let (stop_tx, stop_rx) = oneshot::channel::<()>();
     let task = tokio::spawn(async move {
         let _ = axum::serve(listener, app)

@@ -10,10 +10,14 @@
 //!   summary    print what a plan does
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use cw_orch_kms_penumbra::port;
 use cw_orch_kms_penumbra::penumbra::{custody, page, policy::Policy, session, summary, PinnedAccount};
 use penumbra_sdk_proto::DomainType;
 use penumbra_sdk_transaction::TransactionPlan;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
+
+const PAGE_PORT_ENV: &str = "CW_ORCH_KMS_PENUMBRA_PAGE_PORT";
+const GRPC_PORT_ENV: &str = "CW_ORCH_KMS_PENUMBRA_GRPC_PORT";
 
 #[derive(Parser)]
 struct Cli {
@@ -28,8 +32,10 @@ struct Cli {
     /// Policy JSON (see policy::Policy); default: ics20 + LP + spends/outputs to self.
     #[arg(long)]
     policy: Option<PathBuf>,
-    #[arg(long, default_value = "127.0.0.1:8743")]
-    page: SocketAddr,
+    /// Page address (loopback). Default: env CW_ORCH_KMS_PENUMBRA_PAGE_PORT,
+    /// else a random free port in 18700-18999 (re-picked if taken).
+    #[arg(long)]
+    page: Option<SocketAddr>,
     #[arg(long, default_value_t = 600)]
     timeout_secs: u64,
     #[command(subcommand)]
@@ -39,8 +45,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     Serve {
-        #[arg(long, default_value = "127.0.0.1:8742")]
-        grpc: SocketAddr,
+        /// Default: env CW_ORCH_KMS_PENUMBRA_GRPC_PORT, else random 18700-18999.
+        #[arg(long)]
+        grpc: Option<SocketAddr>,
     },
     Authorize {
         plan: PathBuf,
@@ -55,8 +62,9 @@ enum Cmd {
         /// Node pcli syncs from (read-only), e.g. https://penumbra-grpc.bryanlabs.net
         #[arg(long)]
         node: String,
-        #[arg(long, default_value = "127.0.0.1:8742")]
-        grpc: SocketAddr,
+        /// Default: env CW_ORCH_KMS_PENUMBRA_GRPC_PORT, else random 18700-18999.
+        #[arg(long)]
+        grpc: Option<SocketAddr>,
         #[arg(long, default_value_t = 3600)]
         ttl_secs: u64,
         /// Ephemeral homes + pointer file (`current-home`) live here.
@@ -68,6 +76,16 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let page_addr = match cli.page {
+        Some(a) => a,
+        None => port::loopback_addr_from_env(PAGE_PORT_ENV).map_err(anyhow::Error::msg)?,
+    };
+    let grpc_or_env = |g: Option<SocketAddr>| -> Result<SocketAddr> {
+        match g {
+            Some(a) => Ok(a),
+            None => port::loopback_addr_from_env(GRPC_PORT_ENV).map_err(anyhow::Error::msg),
+        }
+    };
     let policy: Policy = match &cli.policy {
         Some(p) => serde_json::from_slice(&std::fs::read(p)?)?,
         None => Policy::default(),
@@ -79,8 +97,8 @@ async fn main() -> Result<()> {
             pinned_address: pinned,
             policy,
             node_grpc_url: node.clone(),
-            page: cli.page,
-            custody: *grpc,
+            page: page_addr,
+            custody: grpc_or_env(*grpc)?,
             ttl: Duration::from_secs(*ttl_secs),
             approval_timeout: Duration::from_secs(cli.timeout_secs),
             state_dir: state_dir.clone(),
@@ -107,7 +125,7 @@ async fn main() -> Result<()> {
         Cmd::Authorize { plan, out } => {
             let plan = read_plan(&plan)?;
             let approvals = page::Approvals::new();
-            let (url, stop, srv) = page::serve(cli.page, page::router(approvals.clone(), None, axum::Router::new())).await?;
+            let (url, stop, srv) = page::serve(page_addr, page::router(approvals.clone(), None, axum::Router::new())).await?;
             println!("approval page {url}");
             let c = custody::ZignerCustody::new(account, policy, approvals, Duration::from_secs(cli.timeout_secs));
             let data = c.authorize_plan(&plan).await;
@@ -119,10 +137,11 @@ async fn main() -> Result<()> {
         }
         Cmd::Serve { grpc } => {
             let approvals = page::Approvals::new();
-            let (url, _stop, _srv) = page::serve(cli.page, page::router(approvals.clone(), None, axum::Router::new())).await?;
+            let (url, _stop, _srv) = page::serve(page_addr, page::router(approvals.clone(), None, axum::Router::new())).await?;
             let c = custody::ZignerCustody::new(account, policy, approvals, Duration::from_secs(cli.timeout_secs));
-            println!("custody gRPC on {grpc}, approval page {url}");
-            custody::serve(c, grpc).await?;
+            let listener = port::bind_loopback_quiet(grpc_or_env(grpc)?).await.map_err(anyhow::Error::msg)?;
+            println!("custody gRPC on {}, approval page {url}", listener.local_addr()?);
+            custody::serve_listener(c, listener).await?;
         }
         Cmd::Session { .. } => unreachable!(),
     }

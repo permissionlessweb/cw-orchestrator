@@ -21,6 +21,9 @@ pub const MIN_BLOCK_SPEED_ENV_NAME: &str = "CW_ORCH_MIN_BLOCK_SPEED";
 pub const BLOCK_TIME_MIN_ENV_NAME: &str = "CW_ORCH_MIN_BLOCK_TIME";
 pub const BLOCK_TIME_MAX_ENV_NAME: &str = "CW_ORCH_MAX_BLOCK_TIME";
 pub const STATE_FILE_ENV_NAME: &str = "STATE_FILE";
+/// `true`: open the state file read-only (no lock), for dry runs and queries
+/// next to a run that holds the lock.
+pub const STATE_READ_ONLY_ENV_NAME: &str = "CW_ORCH_STATE_READ_ONLY";
 pub const GAS_BUFFER_ENV_NAME: &str = "CW_ORCH_GAS_BUFFER";
 pub const MIN_GAS_ENV_NAME: &str = "CW_ORCH_MIN_GAS";
 pub const MAX_TX_QUERIES_RETRY_ENV_NAME: &str = "CW_ORCH_MAX_TX_QUERY_RETRIES";
@@ -100,6 +103,17 @@ impl DaemonEnvVars {
             Some(parse_block_time_duration(&str_value))
         } else {
             None
+        }
+    }
+
+    /// Optional - boolean
+    /// Defaults to "false"
+    /// Open the state file read-only (no file lock).
+    pub fn state_read_only() -> bool {
+        if let Ok(str_value) = env::var(STATE_READ_ONLY_ENV_NAME) {
+            parse_with_log(str_value, STATE_READ_ONLY_ENV_NAME)
+        } else {
+            false
         }
     }
 

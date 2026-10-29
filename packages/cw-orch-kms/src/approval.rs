@@ -64,7 +64,8 @@ pub struct ApprovalSession {
     pub allowance_limit: u128,
     /// Gas limit on the grant transaction itself.
     pub gas: u64,
-    /// Loopback page. `127.0.0.1:8741` is the usual page.
+    /// Loopback page. Default [`crate::page_addr`]: `CW_ORCH_KMS_PORT`, else a
+    /// random port in 18700-18999 (re-picked if taken when the page binds).
     pub bind: SocketAddr,
     /// Zigner account index for the Terp key. Absent on the QR means 0.
     pub account_index: u32,
@@ -188,7 +189,7 @@ impl ApprovalSession {
             migrates: Vec::new(),
             allowance_limit: 100_000_000,
             gas,
-            bind: "127.0.0.1:8741".parse().expect("loopback port"),
+            bind: crate::port::page_addr(),
             account_index: 0,
             retain: false,
             nested_exec: false,
@@ -583,7 +584,7 @@ async fn open_session(
             let batches = crate::grant::pack_qr_batches(&setup, &tx, session.account_index, &crate::chain::approval_chain().zigner_chain_name)?;
             let total = batches.len();
             for (index, (batch_chain, batch)) in batches.into_iter().enumerate() {
-                println!("approval page http://{} ({}/{})", session.bind, index + 1, total);
+                println!("approval batch {}/{}", index + 1, total);
                 let signed = approve_grant(session, &batch).await?;
                 broadcast_grant(daemon, &session.granter, &signed, &batch, &batch_chain).await?;
             }
@@ -667,8 +668,7 @@ async fn open_authz_session(
         messages: shown,
     });
     println!(
-        "approval page http://{} — one page, {} cold-key bundle{}",
-        session.bind,
+        "approval: one page, {} cold-key bundle{}",
         grant_batches.len(),
         if grant_batches.len() == 1 { "" } else { "s" }
     );

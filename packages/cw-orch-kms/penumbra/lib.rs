@@ -8,6 +8,9 @@
 #[allow(dead_code)]
 pub(crate) mod ui_shared;
 
+#[path = "../src/port.rs"]
+pub mod port;
+
 #[path = "../src/penumbra/mod.rs"]
 pub mod penumbra;
 

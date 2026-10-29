@@ -28,7 +28,13 @@ impl JsonLockedState {
 
         // Lock file, non blocking so it errors in case someone else already holding lock of it
         let lock: FileLock = FileLock::lock(path, false, options)
-            .unwrap_or_else(|_| panic!("Was not able to receive {path} state lock"));
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Was not able to receive {path} state lock (another run holds it). \
+                     For a parallel run set STATE_FILE=<own file> or, for dry runs/queries, \
+                     CW_ORCH_STATE_READ_ONLY=true"
+                )
+            });
 
         // return empty json object if file is empty
         // return file content if not

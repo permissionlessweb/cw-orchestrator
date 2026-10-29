@@ -1,7 +1,9 @@
 #!/bin/sh
-# One command: the cold-wallet run page on 127.0.0.1:8743 (the shared
-# cw-orch-kms page: FVK import from Zigner QR, then every approval) and custody
-# gRPC on 127.0.0.1:8742. Ctrl-C or "End session" wipes the home.
+# One command: the cold-wallet run page (the shared cw-orch-kms page: FVK import
+# from Zigner QR, then every approval) and custody gRPC, both on 127.0.0.1 at
+# random free ports in 18700-18999 (printed at start, with the ssh -L line).
+# Pin them with CW_ORCH_KMS_PENUMBRA_PAGE_PORT / CW_ORCH_KMS_PENUMBRA_GRPC_PORT.
+# Ctrl-C or "End session" wipes the home.
 # Build: (cd packages/cw-orch-kms/penumbra && cargo build --release)
 set -eu
 here=$(cd "$(dirname "$0")/../.." && pwd)
@@ -20,6 +22,6 @@ case "$PENUMBRA_POLICY" in
 esac
 bin=${PZC_BIN:-$here/penumbra/target/release/penumbra-zigner-custody}
 exec "$bin" --expect-address "$PENUMBRA_PINNED_ADDRESS" --policy "$policy" \
-  --page 127.0.0.1:8743 --timeout-secs 900 \
-  session --node "$PENUMBRA_NODE" --grpc 127.0.0.1:8742 \
+  --timeout-secs 900 \
+  session --node "$PENUMBRA_NODE" \
   --ttl-secs "$PENUMBRA_SESSION_TTL_SECS" --state-dir "${HOME}/.cw-orch-kms/penumbra"

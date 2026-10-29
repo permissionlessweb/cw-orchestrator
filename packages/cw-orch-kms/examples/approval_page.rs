@@ -24,7 +24,7 @@ async fn main() {
         ],
     };
     let mut terminal = listen(
-        "127.0.0.1:8741".parse().expect("addr"),
+        cw_orch_kms::page_addr(),
         view,
         Arc::new(TestApprover),
     )

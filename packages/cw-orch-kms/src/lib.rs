@@ -17,6 +17,7 @@ mod spawn;
 mod sender;
 mod session;
 mod terminal;
+pub mod port;
 mod ui_shared;
 mod tx_extension;
 mod wire;
@@ -24,6 +25,7 @@ mod wire;
 mod zigner_e2e;
 
 pub use ephemeral::ensure_ephemeral_mnemonic;
+pub use port::{page_addr, PORT_ENV, PORT_RANGE};
 pub use chain::{approval_chain, clear_approval_chain, set_approval_chain, validate_address, ChainProfile, DEFAULT_COIN_TYPE};
 pub use policy::*;
 pub use approval::{

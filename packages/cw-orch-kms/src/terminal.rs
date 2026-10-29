@@ -158,9 +158,7 @@ pub async fn listen(
     if !addr.ip().is_loopback() {
         return Err(format!("terminal refused: bind {addr} is not loopback"));
     }
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|err| format!("terminal bind refused: {err}"))?;
+    let listener = crate::port::bind_loopback(addr).await?;
     let bound = listener
         .local_addr()
         .map_err(|err| format!("terminal addr refused: {err}"))?;
@@ -198,9 +196,7 @@ pub async fn listen_sign_doc(
     if !addr.ip().is_loopback() {
         return Err(format!("terminal refused: bind {addr} is not loopback"));
     }
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|err| format!("terminal bind refused: {err}"))?;
+    let listener = crate::port::bind_loopback(addr).await?;
     let bound = listener
         .local_addr()
         .map_err(|err| format!("terminal addr refused: {err}"))?;
@@ -293,9 +289,7 @@ pub async fn listen_bundles(
     if bundles.is_empty() {
         return Err("terminal refused: no session bundles".into());
     }
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|err| format!("terminal bind refused: {err}"))?;
+    let listener = crate::port::bind_loopback(addr).await?;
     let bound = listener
         .local_addr()
         .map_err(|err| format!("terminal addr refused: {err}"))?;

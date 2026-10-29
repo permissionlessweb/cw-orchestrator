@@ -218,7 +218,7 @@ impl DaemonAsyncBuilder {
                     json_file_path,
                     &chain_info,
                     deployment_id,
-                    false,
+                    crate::env::DaemonEnvVars::state_read_only(),
                     self.write_on_change.unwrap_or(true),
                 )?
             }

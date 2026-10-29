@@ -274,9 +274,12 @@ pub struct SessionConfig {
     pub policy: Policy,
     pub node_grpc_url: String,
     /// The run's page: FVK import, status, end and every approval.
-    /// Default 127.0.0.1:8743.
+    /// The binary defaults to a random 18700-18999 port (env
+    /// `CW_ORCH_KMS_PENUMBRA_PAGE_PORT` pins it).
     pub page: SocketAddr,
-    /// Custody gRPC pcli talks to. Default 127.0.0.1:8742.
+    /// Custody gRPC pcli talks to. The binary defaults to a random 18700-18999
+    /// port (env `CW_ORCH_KMS_PENUMBRA_GRPC_PORT` pins it); the pcli home gets
+    /// the port actually bound.
     pub custody: SocketAddr,
     pub ttl: Duration,
     pub approval_timeout: Duration,
@@ -437,10 +440,16 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
             }
             let account = shared.live.lock().await.account.clone().ok_or_else(|| anyhow!("no account"))?;
             let dir = cfg.state_dir.join(format!("home-{}", &token()[..12]));
-            write_pcli_home(&dir, &account.fvk, &cfg.node_grpc_url, cfg.custody)?;
+            let custody_listener = crate::port::bind_loopback_quiet(cfg.custody)
+                .await
+                .map_err(anyhow::Error::msg)
+                .with_context(|| format!("binding {}", cfg.custody))?;
+            let custody_addr = custody_listener.local_addr()?;
+            page::check_bind(custody_addr)?;
+            println!("custody gRPC on {custody_addr}");
+            write_pcli_home(&dir, &account.fvk, &cfg.node_grpc_url, custody_addr)?;
             std::fs::write(&pointer, dir.display().to_string())?;
             home = Some(dir.clone());
-            let custody_listener = tokio::net::TcpListener::bind(cfg.custody).await.with_context(|| format!("binding {}", cfg.custody))?;
             let zc = custody::ZignerCustody::new(account, cfg.policy.clone(), approvals.clone(), cfg.approval_timeout);
             {
                 let mut l = shared.live.lock().await;
