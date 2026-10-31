@@ -255,6 +255,24 @@ impl AuthzSession {
         &self.granter
     }
 
+    /// Record a tx-set step (`simulate`, `broadcast`, ...) for the page's
+    /// step N of M panel and log it. Never pass secrets in `detail`.
+    pub fn step(&self, label: &str, status: crate::progress::Status, tx_hash: Option<&str>, detail: Option<&str>) {
+        crate::progress::update_detail(label, status, tx_hash, detail);
+        let mut line = format!(
+            "{} {label} {}",
+            if status == crate::progress::Status::Error { "err" } else { "ok" },
+            status.as_str()
+        );
+        if let Some(hash) = tx_hash {
+            line.push_str(&format!(" {hash}"));
+        }
+        if let Some(detail) = detail {
+            line.push_str(&format!(" ({detail})"));
+        }
+        self.note(&line);
+    }
+
     pub fn grantee(&self) -> &str {
         &self.grantee
     }
@@ -275,7 +293,21 @@ impl AuthzSession {
     }
 
     fn revoke_now(&mut self) -> Result<(), String> {
+        let result = self.revoke_inner();
+        // The page server goes with this session. A run that opens another
+        // page (the next batch) finds the tab still polling this port.
+        if let Some(page) = self.page.take() {
+            let port = page.addr().port();
+            drop(page);
+            crate::progress::start_standby(port);
+        }
+        result
+    }
+
+    fn revoke_inner(&mut self) -> Result<(), String> {
+        use crate::progress::{update, update_detail, Status};
         if self.retain {
+            update_detail(REVOKE_STEP, Status::Confirmed, None, Some("grant retained"));
             if let Some(page) = &self.page {
                 page.note("ok session grant retained");
             }
@@ -283,6 +315,7 @@ impl AuthzSession {
             return Ok(());
         }
         let msgs = revoke_exec_anys(&self.granter, &self.grantee, &self.type_urls)?;
+        update(REVOKE_STEP, Status::Running, None);
         let handle = self.daemon.rt_handle.clone();
         let sender = self.daemon.sender();
         let mut attempt = 0;
@@ -298,12 +331,17 @@ impl AuthzSession {
                 _ => break c,
             }
         };
-        if let Err(err) = commit {
-            if let Some(page) = &self.page {
-                page.note(&format!("err session revoke refused: {err}"));
+        let commit = match commit {
+            Err(err) => {
+                update_detail(REVOKE_STEP, Status::Error, None, Some(&err.to_string()));
+                if let Some(page) = &self.page {
+                    page.note(&format!("err session revoke refused: {err}"));
+                }
+                return Err(format!("session revoke refused: {err}"));
             }
-            return Err(format!("session revoke refused: {err}"));
-        }
+            Ok(commit) => commit,
+        };
+        update(REVOKE_STEP, Status::Broadcast, Some(&commit.txhash));
         if let Some(page) = &self.page {
             page.note("ok session revoke broadcast");
             let _ = handle.block_on(async {
@@ -433,6 +471,19 @@ fn prepare_builder(builder: &DaemonBuilder) -> Result<(), String> {
 }
 
 pub fn enable_session(
+    builder: &DaemonBuilder,
+    session: ApprovalSession,
+    automatic: Vec<SigningRequest>,
+) -> Result<AuthzSession, String> {
+    let result = enable_session_inner(builder, session, automatic);
+    if let Err(err) = &result {
+        // Shown on the still-open tab (standby page) instead of a dead socket.
+        crate::progress::update_detail(AUTHORIZE_STEP, crate::progress::Status::Error, None, Some(err));
+    }
+    result
+}
+
+fn enable_session_inner(
     builder: &DaemonBuilder,
     mut session: ApprovalSession,
     automatic: Vec<SigningRequest>,
@@ -602,6 +653,10 @@ async fn open_session(
     }
 }
 
+/// Progress labels of the session steps this module drives.
+pub const AUTHORIZE_STEP: &str = "authorize";
+pub const REVOKE_STEP: &str = "revoke";
+
 async fn open_authz_session(
     mut daemon: Daemon,
     session: ApprovalSession,
@@ -652,6 +707,7 @@ async fn open_authz_session(
         }
     };
     if grant_batches.is_empty() {
+        crate::progress::update_detail(AUTHORIZE_STEP, crate::progress::Status::Confirmed, None, Some("grant already on chain"));
         arm(&mut daemon, &session.granter);
         println!("session grant already covers this run");
         return Ok(finished(daemon, session, grantee, None));
@@ -689,9 +745,11 @@ async fn open_authz_session(
         grant_count,
     )
     .await?;
+    crate::progress::update(AUTHORIZE_STEP, crate::progress::Status::Running, None);
     let signatures = incoming
         .await
         .map_err(|_| "session refused: the approval page closed".to_string())?;
+    crate::progress::update_detail(AUTHORIZE_STEP, crate::progress::Status::Signed, None, Some(&format!("{} cold signature(s)", signatures.len())));
     if signatures.len() != grant_count {
         return Err("session refused: missing authorization signature".into());
     }
@@ -712,10 +770,12 @@ async fn open_authz_session(
         .await
         {
             Ok(hash) => {
+                crate::progress::update(AUTHORIZE_STEP, crate::progress::Status::Broadcast, Some(&hash));
                 terminal.note(&format!("ok session grant {hash}"));
                 tokio::task::yield_now().await;
             }
             Err(err) => {
+                crate::progress::update_detail(AUTHORIZE_STEP, crate::progress::Status::Error, None, Some(&err));
                 terminal.note(&format!("err {err}"));
                 tokio::task::yield_now().await;
                 return Err(err);

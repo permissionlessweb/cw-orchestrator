@@ -332,3 +332,66 @@ pub(crate) fn hex_encode(bytes: &[u8]) -> String {
     }
     out
 }
+
+/// Follows the run across page servers: polls `/state` right away, after each
+/// [`cwOrchFollowNow`] (the page calls it after every POST/ws reply), then every
+/// second; renders step N of M, batch k/K, per-step status and tx hash into
+/// `#run-progress`; reloads the tab when another page server (next phase, next
+/// batch, next process) answers on this port, which re-arms the scanner for the
+/// new step. A failed poll (no server between phases) only shows "waiting".
+pub(crate) const FOLLOW_SCRIPT: &str = r#"<script>
+(function () {
+  var mine = null, timer = null, busy = false, last = "";
+  function box() {
+    var el = document.getElementById("run-progress");
+    if (!el) {
+      el = document.createElement("section");
+      el.id = "run-progress";
+      var shell = document.querySelector(".shell") || document.body;
+      shell.insertBefore(el, shell.firstChild ? shell.firstChild.nextSibling : null);
+    }
+    return el;
+  }
+  function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function kind(status) {
+    if (status === "error") return "err";
+    if (status === "signed" || status === "broadcast" || status === "confirmed") return "ok";
+    return "wait";
+  }
+  function render(s) {
+    var head;
+    if (!s) {
+      head = "<p class=\"wait\" id=\"run-head\">waiting for the next step (the run is between pages). this tab opens it by itself</p>";
+    } else {
+      var cur = s.steps[s.step - 1];
+      head = "<p class=\"" + (s.error ? "err" : (s.done ? "ok" : "wait")) + "\" id=\"run-head\">" +
+        (s.total ? "step " + s.step + " of " + s.total : "no steps planned") +
+        " · batch " + s.batch + "/" + s.batches +
+        (cur ? " · " + esc(cur.label) + ": " + esc(cur.status) : "") +
+        (s.standby ? " · " + esc(s.phase) : "") + "</p>";
+      head += "<ol id=\"run-steps\">" + s.steps.map(function (st) {
+        return "<li class=\"" + kind(st.status) + "\">" + esc(st.label) + " (batch " + st.batch + "/" + st.batches + "): " + esc(st.status) +
+          (st.tx_hash ? " · tx <code>" + esc(st.tx_hash) + "</code>" : "") +
+          (st.detail ? " · " + esc(st.detail) : "") + "</li>";
+      }).join("") + "</ol>";
+    }
+    if (head !== last) { box().innerHTML = head; last = head; }
+  }
+  function poll() {
+    if (busy) return;
+    busy = true;
+    fetch("/state", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
+      busy = false;
+      if (s && mine && s.instance !== mine) { location.reload(); return; }
+      render(s);
+    }).catch(function () { busy = false; render(null); });
+  }
+  window.cwOrchFollow = function (instance) {
+    mine = instance;
+    poll();
+    if (timer) clearInterval(timer);
+    timer = setInterval(poll, 1000);
+  };
+  window.cwOrchFollowNow = function () { poll(); };
+})();
+</script>"#;

@@ -125,6 +125,7 @@ impl Terminal {
 }
 
 struct AppState {
+    instance: String,
     html: String,
     prompt: String,
     digest: String,
@@ -233,8 +234,24 @@ pub fn capture_granter_sync(
         .enable_all()
         .build()
         .map_err(|err| format!("granter refused: {err}"))?;
-    runtime.block_on(capture_granter(addr, account_index, binding))
+    let result = runtime.block_on(capture_granter_bound(addr, account_index, binding));
+    // The runtime (and with it the page listener) is gone now; keep the port
+    // answering until the session page binds it, so the tab auto-advances.
+    drop(runtime);
+    match result {
+        Ok((signer, port)) => {
+            crate::progress::start_standby(port);
+            Ok(signer)
+        }
+        Err(err) => {
+            crate::progress::update_detail(GRANTER_STEP, crate::progress::Status::Error, None, Some(&err));
+            Err(err)
+        }
+    }
 }
+
+/// Progress label of the granter challenge step.
+pub const GRANTER_STEP: &str = "granter challenge";
 
 /// One off-chain signature. The Terp address of the signing key is the granter.
 pub async fn capture_granter(
@@ -242,6 +259,20 @@ pub async fn capture_granter(
     account_index: u32,
     binding: &str,
 ) -> Result<String, String> {
+    capture_granter_bound(addr, account_index, binding).await.map(|(signer, _)| signer)
+}
+
+/// [`capture_granter`] plus the port the page used. That port becomes the
+/// process page port, so the session page that follows opens where the tab is.
+async fn capture_granter_bound(
+    addr: SocketAddr,
+    account_index: u32,
+    binding: &str,
+) -> Result<(String, u16), String> {
+    if crate::progress::steps().is_empty() {
+        crate::progress::plan(&crate::progress::DEFAULT_PLAN);
+    }
+    crate::progress::update(GRANTER_STEP, crate::progress::Status::Running, None);
     if binding.trim().is_empty() {
         return Err("granter refused: empty binding".into());
     }
@@ -250,12 +281,15 @@ pub async fn capture_granter(
         "the key that signs {binding} is the granter"
     ))];
     let mut terminal = listen_sign_doc(addr, "key", doc, messages, account_index).await?;
+    let port = terminal.addr().port();
+    crate::port::pin_page_port(port);
     let outcome = terminal.outcome().await?;
     drop(terminal);
     match outcome {
         TerminalOutcome::Signed { signer, .. } => {
             crate::policy::validate_chain_address(&signer).map_err(|e| format!("granter refused: {e}"))?;
-            Ok(signer)
+            crate::progress::update(GRANTER_STEP, crate::progress::Status::Signed, None);
+            Ok((signer, port))
         }
         TerminalOutcome::Approved { .. } => {
             Err("granter refused: the page returned an off-chain approval".into())
@@ -396,7 +430,17 @@ fn serve_with(
     let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
     let (notes, _) = broadcast::channel(64);
     let _ = (qr_doc, account_index, intro);
+    // Each server gets a fresh instance id. An open tab that sees another id
+    // on /state reloads into this page (auto-advance across phases/batches).
+    let instance = crate::progress::next_instance();
+    crate::progress::set_phase(if bundle_docs.is_empty() { "cold-key challenge" } else { "session authorization" }, false);
+    let html = if html.contains("</body>") {
+        html.replacen("</body>", &format!("<script>if (window.cwOrchFollow) cwOrchFollow({});</script></body>", json_string(&instance)), 1)
+    } else {
+        html
+    };
     let state = AppState {
+        instance,
         html,
         prompt: prompt(view, &approval),
         digest: view.digest.as_str().to_string(),
@@ -419,6 +463,7 @@ fn serve_with(
     let app = Router::new()
         .route("/", get(index))
         .route("/ws", get(ws))
+        .route("/state", get(run_state))
         .route("/zafu-wasm/zafu_wasm.js", get(wasm_js))
         .route("/zafu-wasm/zafu_wasm_bg.wasm", get(wasm_bg))
         .route("/zafu-wasm/snippets/{*rest}", get(wasm_snippet))
@@ -532,6 +577,7 @@ fn page(
 <body><div class=\"shell\">\
 <p class=\"mark\">ZAFU <span>·</span> SESSION</p>\
 <h1>Approve this run</h1>\
+<section id=\"run-progress\"></section>\
 <p class=\"lede\" id=\"approval\">{approval}</p>\
 <div class=\"row\"><span class=\"chip\" id=\"principal\">{principal}</span></div>\
 <p class=\"meta\" id=\"digest\">{digest}</p>\
@@ -558,7 +604,7 @@ fn page(
 </details>\
 </div>\
 <script src=\"/zxing/index.min.js\"></script>\
-{shared}{script}</body></html>",
+{shared}{follow}{script}</body></html>",
         digest = escape(view.digest.as_str()),
         chain_json = json_string(&approval_chain_id().unwrap_or_default()).replace('<', "\\u003c"),
         principal = escape(view.principal.as_str()),
@@ -569,6 +615,7 @@ fn page(
         qr = qr,
         style = PAGE_STYLE,
         shared = SHARED_SCRIPT,
+        follow = FOLLOW_SCRIPT,
         script = PAGE_SCRIPT,
     )
 }
@@ -696,8 +743,15 @@ const PAGE_SCRIPT: &str = r#"<script>
     return true;
   }
   ws.onopen = function () { open = true; };
+  ws.onclose = function () {
+    open = false;
+    stopScan();
+    scanStatus.textContent = "this step is done. waiting for the next step; this tab opens it by itself";
+    if (window.cwOrchFollowNow) cwOrchFollowNow();
+  };
   ws.onmessage = function (ev) {
     var text = String(ev.data || "");
+    if (window.cwOrchFollowNow) setTimeout(cwOrchFollowNow, 0);
     if (text.indexOf("digest=") === 0) return;
     if (text.indexOf("log ") === 0) {
       var body = text.slice(4);
@@ -1139,6 +1193,10 @@ fn prompt(view: &ApprovalView, approval: &str) -> String {
 
 async fn index(State(state): State<Arc<AppState>>) -> Html<String> {
     Html(state.html.clone())
+}
+
+async fn run_state(State(state): State<Arc<AppState>>) -> Response {
+    crate::progress::state_response(crate::progress::state_json(&state.instance))
 }
 
 async fn missing() -> axum::http::StatusCode {

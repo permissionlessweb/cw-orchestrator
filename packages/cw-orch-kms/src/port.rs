@@ -74,6 +74,16 @@ pub fn page_addr() -> SocketAddr {
     loopback(*pinned.get_or_insert_with(|| free_port(None)))
 }
 
+/// Make `port` this process's page port, so every later page (the session
+/// authorization after the granter challenge, the next batch) opens on the port
+/// the operator's tab and ssh tunnel already use. `CW_ORCH_KMS_PORT` still wins.
+pub fn pin_page_port(port: u16) {
+    if port == 0 {
+        return;
+    }
+    *PINNED.lock().unwrap_or_else(|p| p.into_inner()) = Some(port);
+}
+
 fn may_repick(port: u16) -> bool {
     PORT_RANGE.contains(&port) && !matches!(env_port(PORT_ENV), Ok(Some(p)) if p == port)
 }
@@ -94,6 +104,8 @@ pub async fn bind_loopback_quiet(addr: SocketAddr) -> Result<tokio::net::TcpList
     if !addr.ip().is_loopback() {
         return Err(format!("terminal refused: bind {addr} is not loopback"));
     }
+    // The standby server (between two pages) holds the port; release it first.
+    crate::progress::stop_standby();
     let mut want = addr;
     let mut tries = 0;
     loop {

@@ -18,6 +18,7 @@ mod sender;
 mod session;
 mod terminal;
 pub mod port;
+pub mod progress;
 mod ui_shared;
 mod tx_extension;
 mod wire;
