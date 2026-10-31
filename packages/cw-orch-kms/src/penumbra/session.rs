@@ -10,6 +10,13 @@
 //! When the TTL expires, the page's "end session" is pressed, or the process
 //! gets Ctrl-C, the home is overwritten with zeros and removed, and the
 //! pointer file is deleted. Stale homes from a crash are wiped on next start.
+//!
+//! Exception (on by default, `--ephemeral-view` to disable): pcli's view DB
+//! (`pcli-view.sqlite`, sync height + decrypted notes, which also embeds the
+//! FVK) is moved out of the home into `SessionConfig::view_cache` before the
+//! wipe and restored on the next session, so later runs resume syncing from
+//! the local pd instead of from genesis. Cache dir 0700, files 0600, keyed by
+//! wallet id + node so another wallet/chain never resumes foreign state.
 //! Mirrors cw-orch-kms's session/revoke model.
 
 use super::{custody, page, policy::Policy, PinnedAccount};
@@ -237,6 +244,85 @@ pub fn write_pcli_home(dir: &Path, fvk: &FullViewingKey, node_grpc_url: &str, cu
     Ok(())
 }
 
+/// pcli's view database inside a home (`pcli::VIEW_FILE_NAME`).
+pub const VIEW_FILE: &str = "pcli-view.sqlite";
+const VIEW_SIDECARS: [&str; 3] = ["", "-wal", "-shm"];
+
+/// Where the persistent view DB for `fvk` synced from `node_grpc_url` lives
+/// under `dir`. Keyed by the public wallet id and the node, so a different
+/// wallet or chain never resumes someone else's sync state.
+pub fn view_cache_file(dir: &Path, fvk: &FullViewingKey, node_grpc_url: &str) -> PathBuf {
+    let wid = fvk.wallet_id().to_string();
+    let wid_tail: String = wid.chars().rev().take(16).collect::<Vec<_>>().into_iter().rev().collect();
+    let node: String = node_grpc_url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://")
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .take(64)
+        .collect();
+    dir.join(format!("{wid_tail}-{node}.sqlite"))
+}
+
+fn move_file(from: &Path, to: &Path) -> Result<()> {
+    if std::fs::rename(from, to).is_ok() {
+        return Ok(());
+    }
+    // different filesystem: copy, then zero and remove the source
+    std::fs::copy(from, to).with_context(|| format!("copying {}", from.display()))?;
+    if let Ok(mut f) = std::fs::OpenOptions::new().write(true).open(from) {
+        let len = std::fs::metadata(from).map(|m| m.len() as usize).unwrap_or(0);
+        let _ = f.write_all(&vec![0u8; len]);
+        let _ = f.sync_all();
+    }
+    std::fs::remove_file(from)?;
+    Ok(())
+}
+
+fn set_private(p: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600));
+}
+
+/// Move a cached view DB (and its sqlite sidecars) into `home` so pcli resumes
+/// from the last synced height. `Ok(false)` when there is nothing cached yet.
+pub fn restore_view_db(cache_file: &Path, home: &Path) -> Result<bool> {
+    if !cache_file.exists() {
+        return Ok(false);
+    }
+    for sfx in VIEW_SIDECARS {
+        let from = PathBuf::from(format!("{}{sfx}", cache_file.display()));
+        if from.exists() {
+            let to = home.join(format!("{VIEW_FILE}{sfx}"));
+            move_file(&from, &to)?;
+            set_private(&to);
+        }
+    }
+    Ok(true)
+}
+
+/// Move `home`'s view DB back into the persistent cache (before the home is
+/// wiped). The DB holds the FVK and decrypted notes, so the cache is 0700/0600.
+pub fn save_view_db(home: &Path, cache_file: &Path) -> Result<bool> {
+    if !home.join(VIEW_FILE).exists() {
+        return Ok(false);
+    }
+    if let Some(dir) = cache_file.parent() {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().mode(0o700).recursive(true).create(dir)?;
+    }
+    for sfx in VIEW_SIDECARS {
+        let to = PathBuf::from(format!("{}{sfx}", cache_file.display()));
+        let _ = std::fs::remove_file(&to);
+        let from = home.join(format!("{VIEW_FILE}{sfx}"));
+        if from.exists() {
+            move_file(&from, &to)?;
+            set_private(&to);
+        }
+    }
+    Ok(true)
+}
+
 /// Overwrite every file under `dir` with zeros, then remove it.
 pub fn wipe(dir: &Path) -> Result<()> {
     if !dir.exists() {
@@ -285,6 +371,11 @@ pub struct SessionConfig {
     pub approval_timeout: Duration,
     /// Parent dir for ephemeral homes; a pointer file `current-home` lives here too.
     pub state_dir: PathBuf,
+    /// Persistent directory for pcli's view DB (sync state). `Some`: the DB is
+    /// moved into the ephemeral home at start and back here at teardown (also
+    /// rescued from a crashed run), so the next run resumes from the last
+    /// synced height. `None`: the DB is wiped with the home.
+    pub view_cache: Option<PathBuf>,
 }
 
 #[derive(Default)]
@@ -296,10 +387,13 @@ struct Live {
     ended: bool,
     /// Public facts about the last scan (format, wallet id, ownership). Never the FVK.
     last_scan: Option<String>,
+    /// "resumed <file>", "new <file>" or "ephemeral".
+    view_db: Option<String>,
 }
 
 struct Shared {
     cfg_pinned: Address,
+    node: String,
     approvals: Arc<page::Approvals>,
     live: Mutex<Live>,
     import_tx: watch::Sender<bool>,
@@ -361,8 +455,21 @@ async fn status(State(s): State<Arc<Shared>>, h: HeaderMap) -> Response {
     }
     let live = s.live.lock().await;
     let state = if live.ended { "ended" } else if live.home.is_some() { "active" } else if live.account.is_some() { "starting" } else { "waiting_for_fvk" };
+    let pending = s.approvals.pending_id();
+    // The page's stepper reads this; it advances as soon as the import lands.
+    let step = match (state, pending) {
+        ("ended", _) => "ended",
+        ("waiting_for_fvk", _) => "auth",
+        ("starting", _) => "starting",
+        (_, Some(_)) => "sign",
+        _ => "action",
+    };
     let j = serde_json::json!({
         "state": state,
+        "step": step,
+        "approval_id": pending,
+        "node": s.node,
+        "view_db": live.view_db,
         "wallet_id": live.account.as_ref().map(|a| a.wallet_id()),
         "home": live.home.as_ref().map(|p| p.display().to_string()),
         "expires_in_secs": live.expires.map(|e| e.saturating_duration_since(Instant::now()).as_secs()),
@@ -400,16 +507,27 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
     std::fs::create_dir_all(&cfg.state_dir)?;
     // crash recovery: wipe a home left by a previous run
     let pointer = cfg.state_dir.join("current-home");
+    let cache_pointer = cfg.state_dir.join("current-view-cache");
     if let Ok(old) = std::fs::read_to_string(&pointer) {
+        // rescue the synced view DB of a crashed run before wiping its home
+        if let Ok(cache) = std::fs::read_to_string(&cache_pointer) {
+            match save_view_db(Path::new(old.trim()), Path::new(cache.trim())) {
+                Ok(true) => println!("rescued view DB from a previous run into {}", cache.trim()),
+                Ok(false) => {}
+                Err(e) => eprintln!("warn could not rescue view DB: {e:#}"),
+            }
+        }
         let _ = wipe(Path::new(old.trim()));
         let _ = std::fs::remove_file(&pointer);
     }
+    let _ = std::fs::remove_file(&cache_pointer);
     let approvals = page::Approvals::new();
     let tok = approvals.token().to_string();
     let (import_tx, mut import_rx) = watch::channel(false);
     let (end_tx, mut end_rx) = watch::channel(false);
     let shared = Arc::new(Shared {
         cfg_pinned: pinned,
+        node: cfg.node_grpc_url.clone(),
         approvals: approvals.clone(),
         live: Mutex::new(Live::default()),
         import_tx,
@@ -420,7 +538,11 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
         .route("/status", get(status))
         .route("/end", post(end))
         .with_state(shared.clone());
-    let card = page::session_card(cfg.pinned_address.trim());
+    let view_mode = match &cfg.view_cache {
+        Some(d) => format!("persistent view DB in {}", d.display()),
+        None => "ephemeral view DB (wiped at the end)".to_string(),
+    };
+    let card = page::session_card_with(cfg.pinned_address.trim(), &cfg.node_grpc_url, &view_mode);
     let app = page::router(approvals.clone(), Some(&card), session_routes);
     let (page_url, stop_tx, page_srv) = page::serve(cfg.page, app).await?;
     println!("penumbra session page {page_url}");
@@ -434,6 +556,7 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
             _ = tokio::time::sleep_until(deadline) => true,
         };
         let mut home: Option<PathBuf> = None;
+        let mut cache_file: Option<PathBuf> = None;
         let result: Result<()> = async {
             if ended_early {
                 return Ok(());
@@ -450,11 +573,27 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
             write_pcli_home(&dir, &account.fvk, &cfg.node_grpc_url, custody_addr)?;
             std::fs::write(&pointer, dir.display().to_string())?;
             home = Some(dir.clone());
+            let view_db = match &cfg.view_cache {
+                Some(cdir) => {
+                    let f = view_cache_file(cdir, &account.fvk, &cfg.node_grpc_url);
+                    std::fs::write(&cache_pointer, f.display().to_string())?;
+                    cache_file = Some(f.clone());
+                    if restore_view_db(&f, &dir)? {
+                        println!("resuming view sync from {}", f.display());
+                        format!("resumed {}", f.display())
+                    } else {
+                        println!("no cached view DB yet; first sync will be saved to {}", f.display());
+                        format!("new {}", f.display())
+                    }
+                }
+                None => "ephemeral".to_string(),
+            };
             let zc = custody::ZignerCustody::new(account, cfg.policy.clone(), approvals.clone(), cfg.approval_timeout);
             {
                 let mut l = shared.live.lock().await;
                 l.home = Some(dir.clone());
                 l.expires = Some(deadline.into_std());
+                l.view_db = Some(view_db);
             }
             println!("ok view session active for {}s\n  pcli --home {} view balance", deadline.saturating_duration_since(tokio::time::Instant::now()).as_secs(), dir.display());
             tokio::select! {
@@ -473,13 +612,21 @@ pub async fn start(cfg: SessionConfig) -> Result<Running> {
             l.home = None;
             l.ended = true;
         }
+        if let (Some(d), Some(f)) = (&home, &cache_file) {
+            match save_view_db(d, f) {
+                Ok(true) => println!("view DB kept for the next run: {}", f.display()),
+                Ok(false) => {}
+                Err(e) => eprintln!("warn could not keep the view DB ({e:#}); it is wiped with the home"),
+            }
+        }
         if let Some(d) = &home {
             wipe(d)?;
         }
         let _ = std::fs::remove_file(&pointer);
+        let _ = std::fs::remove_file(&cache_pointer);
         let _ = stop_tx.send(());
         let _ = page_srv.await;
-        println!("ok view session ended; ephemeral home wiped");
+        println!("ok view session ended; ephemeral home wiped{}", if cache_file.is_some() { " (view DB kept)" } else { "" });
         result
     });
     Ok(Running { page_url, token: tok, done })

@@ -133,7 +133,44 @@ video{width:min(100%,320px);border-radius:16px;background:#000;margin:8px 0}\
 .term .wait{color:var(--gold)}\
 .term .dim{color:var(--dim)}\
 details{margin-top:8px}\
-summary{cursor:pointer;color:var(--dim);font-size:13px}
+summary{cursor:pointer;color:var(--dim);font-size:13px}\
+h2{font-size:19px;font-weight:650;letter-spacing:-.01em;margin:0 0 6px}\
+[hidden]{display:none!important}\
+.btn{background:var(--gold);color:#16161D;border:0;border-radius:12px;padding:12px 16px;font:600 15px/1 Inter,ui-sans-serif,sans-serif;cursor:pointer}\
+.btn:disabled{background:#3D3020;color:#5A4A30;cursor:default}\
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}\
+.btn.ghost:disabled{color:var(--dim);opacity:.6}\
+.btn.danger{color:var(--err);border-color:#C0505066}\
+.statusbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);padding:10px 14px;font-size:13px}\
+.conn{display:inline-flex;align-items:center;gap:6px;color:var(--dim)}\
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block}\
+.dot.ok{background:var(--ok)}.dot.err{background:var(--err)}.dot.wait{background:var(--gold)}\
+.badge{border-radius:999px;padding:3px 10px;font-size:12px;border:1px solid var(--line);color:var(--dim)}\
+.badge.ok{color:var(--ok);border-color:#50C87866}.badge.err{color:var(--err);border-color:#C0505066}.badge.wait{color:var(--gold);border-color:#F4A31E66}\
+.ttl{margin-left:auto;color:var(--dim);font:12px ui-monospace,SFMono-Regular,Menlo,monospace}\
+.stepper{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:0;margin:10px 0}\
+.stepper li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;column-gap:8px;color:var(--dim)}\
+.stepper .num{grid-row:span 2;width:24px;height:24px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:650}\
+.stepper .name{font-weight:650;font-size:14px}\
+.stepper .sub{font-size:12px}\
+.stepper li.is-on{border-color:var(--gold);color:var(--text)}\
+.stepper li.is-on .num{background:var(--gold);color:#16161D;border-color:var(--gold)}\
+.stepper li.is-done{border-color:#50C87866;color:var(--ok)}\
+.stepper li.is-done .num{background:#50C87822;border-color:var(--ok)}\
+.facts{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 12px;font-size:13px}\
+.facts dt{color:var(--dim)}\
+.facts dd{margin:0;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}\
+.actions{display:grid;gap:8px;margin:0 0 12px}\
+.action-card{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;word-break:break-word}\
+.action-card .num{flex:none;width:22px;height:22px;border-radius:50%;background:#F4A31E22;color:var(--gold);display:grid;place-items:center;font-size:12px;font-weight:650}\
+.alert{border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;border:1px solid var(--line);background:var(--surface);word-break:break-word}\
+.alert.ok{color:var(--ok);border-color:#50C87866;background:#50C8780f}\
+.alert.err{color:#e08080;border-color:#C0505066;background:#C050500f}\
+.alert.wait{color:var(--gold);border-color:#F4A31E66;background:#F4A31E0f}\
+.cmd{background:#07070b;border:1px solid var(--line);border-radius:10px;padding:10px 12px}\
+.cmd:empty{display:none}\
+.scanner.idle{opacity:.7}\
+#check-result.err{color:#e08080}#check-result.wait{color:var(--gold)}
 ";
 
 /// A page in the shared Zafu layout: mark, heading, lede, `body`, the cw-orch
@@ -201,6 +238,12 @@ var cwOrchScan = {
     return reader;
   },
   stop: function (reader, video) {
+    // zxing's reset() stops the camera but not decodeContinuously's loop, so a
+    // stopped reader would keep decoding the shared <video> (and calling its
+    // callback) once the next scan reuses it. Stop the loop first.
+    if (reader && reader.stopContinuousDecode) {
+      try { reader.stopContinuousDecode(); } catch (err) {}
+    }
     if (reader && reader.reset) {
       try { reader.reset(); } catch (err) {}
     }
