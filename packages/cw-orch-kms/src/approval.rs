@@ -769,9 +769,9 @@ fn arm(daemon: &mut Daemon, granter: &str) {
     daemon.sender_mut().set_fee_granter(&granter);
 }
 
-struct SignedGrant {
-    pubkey: Vec<u8>,
-    signature: Vec<u8>,
+pub(crate) struct SignedGrant {
+    pub(crate) pubkey: Vec<u8>,
+    pub(crate) signature: Vec<u8>,
 }
 
 async fn approve_grant(session: &ApprovalSession, tx: &SetupTx) -> Result<SignedGrant, String> {
@@ -889,7 +889,7 @@ async fn broadcast_grant(
     Ok(committed.txhash)
 }
 
-fn legacy_amino_raw(
+pub(crate) fn legacy_amino_raw(
     _granter: &str,
     signed: &SignedGrant,
     tx: &SetupTx,
@@ -1076,7 +1076,7 @@ mod signer_account_tests {
     }
 }
 
-async fn grantee_state(
+pub(crate) async fn grantee_state(
     channel: Channel,
     granter: &str,
     grantee: &str,
@@ -1269,8 +1269,8 @@ mod tests {
         };
         let anys = sdk_anys(&tx.amino, &tx.proto).unwrap();
         assert_eq!(anys.len(), 2);
-        assert_eq!(anys[0].type_url, "/cosmos.authz.v1beta1.MsgGrant");
-        assert_eq!(anys[1].type_url, "/cosmos.feegrant.v1beta1.MsgGrantAllowance");
+        assert_eq!(anys[0].type_url, "/cosmos.feegrant.v1beta1.MsgGrantAllowance");
+        assert_eq!(anys[1].type_url, "/cosmos.authz.v1beta1.MsgGrant");
         let types = amino_msg_types(std::str::from_utf8(&tx.amino).unwrap());
         assert!(!types.iter().any(|name| name.contains("thorchain")));
         let key = k256::ecdsa::SigningKey::from_slice(&[1u8; 32]).unwrap();

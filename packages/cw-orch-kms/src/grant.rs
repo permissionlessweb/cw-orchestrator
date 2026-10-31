@@ -294,24 +294,26 @@ pub fn plan_session_setup_with(
         amino_msgs.push(amino);
         proto.push(bytes);
     }
-    for url in &grant_urls {
-        let (amino, bytes) = encode_planned_grant(
-            granter,
-            &session.grantee,
-            url,
-            session,
-            &expiration,
-            session.expiration_unix,
-        )?;
-        amino_msgs.push(amino);
-        proto.push(bytes);
-    }
+    // The fee allowance rides in front of the authz grants, so it always
+    // lands in the first Zigner document and never needs a scan of its own.
     if grant_fee {
         let (amino, bytes) = encode_allowance(
             granter,
             &session.grantee,
             allowance_denom,
             allowance_limit,
+            &expiration,
+            session.expiration_unix,
+        )?;
+        amino_msgs.push(amino);
+        proto.push(bytes);
+    }
+    for url in &grant_urls {
+        let (amino, bytes) = encode_planned_grant(
+            granter,
+            &session.grantee,
+            url,
+            session,
             &expiration,
             session.expiration_unix,
         )?;
@@ -327,8 +329,8 @@ pub fn plan_session_setup_with(
 }
 
 /// Gas charged for one authz or feegrant message when a cold-key transaction
-/// is bundled. A bundle stops before the next message would pass `chain.gas`,
-/// and also before the sign document would no longer fit in one Zigner code.
+/// is bundled. A bundle stops only before the sign document would no longer
+/// fit in one Zigner code; its gas is `count * MSG_GAS` at `chain`'s price.
 const MSG_GAS: u64 = 200_000;
 
 /// uterp reserved per transaction the ephemeral key broadcasts, including
@@ -414,10 +416,9 @@ pub fn build_revoke_tx(
 
 /// Split one planned setup into Zigner-sized sign documents.
 ///
-/// A document also stops when another message would exceed `chain.gas`.
-/// Sequences are `chain.sequence`, then the next, and so on. The fee on each
-/// document is that bundle's share of `chain.fee_amount`. The feegrant
-/// message, when present, stays a single piece.
+/// Only the Zigner QR size splits documents. Sequences are `chain.sequence`, then the next, and so on. The fee on each
+/// document is that bundle's gas at `chain`'s gas price. The feegrant
+/// message is planned first, so it is always in the first document.
 pub fn pack_qr_batches(
     chain: &SetupChain,
     tx: &SetupTx,
@@ -440,10 +441,10 @@ pub fn pack_qr_batches(
             .ok_or_else(|| "session grant refused: sequence overflow".to_string())?;
         let mut end = start + 1;
         while end < tx.pieces.len() {
+            // Only the QR size splits a document. Gas grows with the
+            // bundle (fee scales at the same price), so authz and feegrant
+            // messages share one scan instead of spilling into a second.
             let count = (end - start + 1) as u64;
-            if count > 1 && count.saturating_mul(MSG_GAS) > chain.gas {
-                break;
-            }
             let candidate = bundle_chain(chain, sequence, count);
             let amino = amino_sign_doc(&candidate, &tx.pieces[start..=end].join(","), sequence);
             if !crate::terminal::zigner_request_fits(account_index, chain_name, &amino) {
@@ -475,10 +476,7 @@ pub fn pack_qr_batches(
 }
 
 fn bundle_chain(chain: &SetupChain, sequence: u64, count: u64) -> SetupChain {
-    let gas = count
-        .saturating_mul(MSG_GAS)
-        .max(MSG_GAS)
-        .min(chain.gas.max(MSG_GAS));
+    let gas = count.saturating_mul(MSG_GAS).max(MSG_GAS);
     let mut batch = chain.clone();
     batch.sequence = sequence;
     batch.gas = gas;
@@ -1215,20 +1213,20 @@ mod tests {
         let doc: serde_json::Value = serde_json::from_slice(&tx.amino).unwrap();
         let msgs = doc["msgs"].as_array().unwrap();
         assert_eq!(msgs.len(), 3);
-        assert_eq!(msgs[0]["type"], "cosmos-sdk/MsgGrant");
+        assert_eq!(msgs[0]["type"], "cosmos-sdk/MsgGrantAllowance");
         assert_eq!(msgs[1]["type"], "cosmos-sdk/MsgGrant");
-        assert_eq!(msgs[2]["type"], "cosmos-sdk/MsgGrantAllowance");
+        assert_eq!(msgs[2]["type"], "cosmos-sdk/MsgGrant");
         assert_eq!(
-            msgs[0]["value"]["grant"]["authorization"]["value"]["msg"],
+            msgs[1]["value"]["grant"]["authorization"]["value"]["msg"],
             "/cosmos.bank.v1beta1.MsgSend"
         );
         assert_eq!(
-            msgs[1]["value"]["grant"]["authorization"]["value"]["msg"],
+            msgs[2]["value"]["grant"]["authorization"]["value"]["msg"],
             MSG_INSTANTIATE
         );
-        assert_eq!(msgs[2]["value"]["allowance"]["value"]["spend_limit"][0]["amount"], "25");
+        assert_eq!(msgs[0]["value"]["allowance"]["value"]["spend_limit"][0]["amount"], "25");
         assert_eq!(tx.proto.len(), 3);
-        let first = MsgGrant::decode(tx.proto[0].as_slice()).unwrap();
+        let first = MsgGrant::decode(tx.proto[1].as_slice()).unwrap();
         assert_eq!(first.grantee, session.grantee());
         assert_eq!(first.granter, "a<b");
         let auth = GenericAuthorization::decode(
@@ -1236,7 +1234,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(auth.msg, "/cosmos.bank.v1beta1.MsgSend");
-        let fee = MsgGrantAllowance::decode(tx.proto[2].as_slice()).unwrap();
+        let fee = MsgGrantAllowance::decode(tx.proto[0].as_slice()).unwrap();
         let allowance = BasicAllowance::decode(fee.allowance.unwrap().value.as_slice()).unwrap();
         assert_eq!(allowance.expiration.unwrap().seconds, 5_090);
         assert_eq!(allowance.spend_limit[0].amount, "25");
@@ -1315,7 +1313,7 @@ mod tests {
         MsgRevoke::decode(tx.proto[0].as_slice()).unwrap();
         MsgRevoke::decode(tx.proto[1].as_slice()).unwrap();
         MsgRevokeAllowance::decode(tx.proto[2].as_slice()).unwrap();
-        MsgGrantAllowance::decode(tx.proto[5].as_slice()).unwrap();
+        MsgGrantAllowance::decode(tx.proto[3].as_slice()).unwrap();
         let text = String::from_utf8(tx.amino.clone()).unwrap();
         assert!(text.find("MsgRevokeAllowance").unwrap() < text.find("MsgGrantAllowance").unwrap());
     }
@@ -1689,7 +1687,7 @@ mod tests {
         let mut seen = 0;
         for (index, (batch_chain, batch)) in batches.iter().enumerate() {
             assert_eq!(batch_chain.sequence, setup.sequence + index as u64);
-            assert!(batch_chain.gas <= setup.gas || batch.pieces.len() == 1);
+            assert_eq!(batch_chain.gas, 200_000 * batch.pieces.len() as u64);
             assert!(crate::terminal::zigner_request_fits(
                 0,
                 "terp",
@@ -1705,7 +1703,7 @@ mod tests {
             )));
         }
         assert_eq!(seen, tx.pieces.len());
-        assert!(batches[0].1.pieces.iter().any(|piece| piece.contains("MsgGrant")));
+        assert!(batches[0].1.pieces.iter().any(|piece| piece.contains("MsgGrantAllowance")));
         assert_eq!(
             batches
                 .iter()
@@ -1714,5 +1712,70 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn the_fee_allowance_shares_the_authz_scan_at_default_gas() {
+        use crate::session::{ApprovalFactor, SessionGrant};
+        // Three authz grants + the allowance = 4 messages. With the default
+        // 600k session gas the old packer split at 3 msgs, so the allowance
+        // needed its own Zigner scan.
+        let allow = crate::allowlist::RunAllowlist::default()
+            .allow_type("/cosmos.bank.v1beta1.MsgSend".to_string())
+            .allow_type("/cosmos.staking.v1beta1.MsgDelegate".to_string())
+            .allow_type("/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward".to_string());
+        let grant = SessionGrant {
+            grantee: "terp1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4wf6ea".into(),
+            expiration_unix: 1_900_000_000,
+            session_id: "s".into(),
+            allowlist: allow,
+            factor: ApprovalFactor::Zafu,
+            nonce: [0u8; 32],
+        };
+        let setup = SetupChain {
+            chain_id: "morocco-1".into(),
+            account_number: 3,
+            sequence: 4,
+            gas: 600_000,
+            fee_denom: "uthiol".into(),
+            fee_amount: 30_000,
+        };
+        let empty = GranteeState { grantee: grant.grantee.clone(), authz: vec![], feegrant: None };
+        let tx = sign(plan_session_setup("terp1granter", &grant, &empty, "uthiol", 100, &setup).unwrap());
+        assert_eq!(tx.pieces.len(), 4);
+        assert!(tx.pieces[0].contains("cosmos-sdk/MsgGrantAllowance"));
+        let batches = pack_qr_batches(&setup, &tx, 0, "terp").unwrap();
+        assert_eq!(batches.len(), 1, "one scan carries authz + feegrant");
+        let (chain, batch) = &batches[0];
+        assert_eq!(batch.pieces.len(), 4);
+        assert_eq!(chain.gas, 800_000);
+        // Same gas price as the session: 30_000 / 600_000 per gas unit.
+        assert_eq!(chain.fee_amount, 40_000);
+        assert_eq!(chain.sequence, 4);
+
+        // Skip-existing: once those grants are live, nothing is signed.
+        let live = GranteeState {
+            grantee: grant.grantee.clone(),
+            authz: grant
+                .allowlist_type_urls()
+                .into_iter()
+                .map(|url| LiveAuthz::generic(url, Some(1_900_000_000)))
+                .collect(),
+            feegrant: Some(LiveFeegrant {
+                denom: "uthiol".into(),
+                limit: Some(100),
+                expiration_unix: Some(1_900_000_000),
+            }),
+        };
+        assert_eq!(
+            plan_session_setup("terp1granter", &grant, &live, "uthiol", 100, &setup).unwrap(),
+            SessionSetup::Ready
+        );
+        // Only a missing allowance: one message, still one scan.
+        let mut no_fee = live.clone();
+        no_fee.feegrant = None;
+        let tx = sign(plan_session_setup("terp1granter", &grant, &no_fee, "uthiol", 100, &setup).unwrap());
+        assert_eq!(tx.pieces.len(), 1);
+        assert!(tx.pieces[0].contains("cosmos-sdk/MsgGrantAllowance"));
     }
 }
