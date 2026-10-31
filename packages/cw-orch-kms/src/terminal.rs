@@ -890,7 +890,7 @@ const PAGE_SCRIPT: &str = r#"<script>
     var match = /^P(\d+)\/(\d+)\/([^/]+)\/(.+)$/.exec(text);
     if (!match) {
       if (/^[0-9a-fA-F]{128}$/.test(text.trim())) {
-        scanStatus.textContent = "that code is only the signature. scan the cw-orch code on the phone";
+        if (!finished && open) { finished = true; scanStatus.textContent = "bare signature received, recovering pubkey"; ws.send("sigonly " + text.trim()); }
       }
       return;
     }
@@ -1185,6 +1185,13 @@ async fn handle(mut socket: WebSocket, state: Arc<AppState>) {
         let text = match incoming {
             Some(Ok(Message::Text(text))) => text.to_string(),
             _ => return,
+        };
+        let text = match text.trim().strip_prefix("sigonly ") {
+            Some(sig_hex) => match recover_check(state.sign_doc.as_deref(), &state.principal, sig_hex) {
+                Some(rewritten) => { println!("sigonly: recovered pubkey for {}", state.principal); rewritten }
+                None => { let _ = socket.send(Message::Text("invalid: bare signature does not recover to the expected sender".to_string().into())).await; continue; }
+            },
+            None => text,
         };
         let trimmed = text.trim();
         if let Some(rest) = trimmed.strip_prefix("check ") {
@@ -1584,6 +1591,28 @@ fn address_matches(addr: &str, pk: &[u8]) -> bool {
     }
     let hash = ripemd::Ripemd160::digest(sha2::Sha256::digest(pk));
     data.as_slice() == hash.as_slice()
+}
+
+/// Bare 64-byte Zigner signature: recover the pubkey over sha256(sign_doc)
+/// (recovery ids 0..=3) and keep the one whose address equals `principal`.
+fn recover_check(sign_doc: Option<&[u8]>, principal: &str, sig_hex: &str) -> Option<String> {
+    use base64::Engine;
+    let doc = sign_doc?;
+    let raw: Vec<u8> = (0..sig_hex.len()).step_by(2).map(|i| u8::from_str_radix(sig_hex.get(i..i + 2)?, 16).ok()).collect::<Option<_>>()?;
+    let sig = k256::ecdsa::Signature::from_slice(&raw).ok()?;
+    let sig = sig.normalize_s().unwrap_or(sig);
+    let hash = sha2::Sha256::digest(doc);
+    for id in 0u8..4 {
+        let Some(rid) = k256::ecdsa::RecoveryId::from_byte(id) else { continue };
+        if let Ok(vk) = k256::ecdsa::VerifyingKey::recover_from_prehash(&hash, &sig, rid) {
+            let pk = vk.to_encoded_point(true).as_bytes().to_vec();
+            if address_matches(principal, &pk) {
+                let b = base64::engine::general_purpose::STANDARD;
+                return Some(format!("check {} {}", b.encode(&pk), b.encode(sig.to_bytes())));
+            }
+        }
+    }
+    None
 }
 
 fn verify_amino(pk: &[u8], sig_bytes: &[u8], message: &[u8]) -> bool {
