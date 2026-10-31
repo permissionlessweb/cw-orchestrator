@@ -62,3 +62,4 @@ pub use tx_extension::add_authenticator_any;
 pub use wire::{encode_group_vk, verify_group_signature, FROST_SIG_LEN};
 pub use direct::{canonical_json, exec_contract_as, AminoMsg};
 pub use grant::{GrantScope, LiveContract};
+pub use terminal::listen_sign_doc;
