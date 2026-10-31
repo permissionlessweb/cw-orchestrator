@@ -550,6 +550,7 @@ async fn view_session_import_sign_end_wipe() {
         ttl: Duration::from_secs(60),
         approval_timeout: Duration::from_secs(30),
         state_dir: state.clone(),
+        view_cache: None,
     })
     .await
     .unwrap();
@@ -627,3 +628,76 @@ fn wallet_template_policy_covers_wallet_actions() {
 /// Address Zigner's receive screen shows for the public "abandon ... about" vector
 /// (computed with zigner rust/db_handling/src/penumbra/keys.rs at e064470d).
 const ZIGNER_DB_HANDLING_ADDR_ABANDON: &str = "penumbra1q9xh805r9tqznerjk0r7ffmyv9u9kwftyslphe6ym7gd88hyx9fzr5rdxwnj68prshpx3530kvxkkpzenvnl0rm4vdkmj7nrw0rjr5u3979cm6258893kjtxvzmssjjwkw58vw";
+
+async fn wait_status(page: &str, tok: &str, needle: &str) -> String {
+    for _ in 0..100 {
+        let (_, s) = http(page, "GET", "/status", Some(tok), "").await;
+        if s.contains(needle) {
+            return s;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("status never contained {needle}");
+}
+
+/// The step state advances on the server as soon as the FVK lands (no page
+/// reload), and the view DB survives the session for the next run.
+#[tokio::test]
+async fn session_steps_advance_and_view_db_persists() {
+    let sk = test_key(7);
+    let fvk = sk.full_viewing_key().clone();
+    let me = fvk.payment_address(0u32.into()).0.to_string();
+    let root = std::env::temp_dir().join(format!("pzc-view-{}", std::process::id()));
+    let cache = root.join("view");
+    let node = "http://127.0.0.1:18895";
+    let run = |state: std::path::PathBuf| {
+        let me = me.clone();
+        let cache = cache.clone();
+        async move {
+            session::start(session::SessionConfig {
+                pinned_address: me,
+                policy: Policy::wallet_template("penumbra-1", vec![]),
+                node_grpc_url: node.into(),
+                page: "127.0.0.1:0".parse().unwrap(),
+                custody: "127.0.0.1:0".parse().unwrap(),
+                ttl: Duration::from_secs(60),
+                approval_timeout: Duration::from_secs(30),
+                state_dir: state,
+                view_cache: Some(cache),
+            })
+            .await
+            .unwrap()
+        }
+    };
+    let cache_file = session::view_cache_file(&cache, &fvk, node);
+    for round in 0..2 {
+        let r = run(root.join("state")).await;
+        let page = r.page_url.trim_start_matches("http://").trim_end_matches('/').to_string();
+        let (_, html) = http(&page, "GET", "/", None, "").await;
+        assert!(html.contains("id=\"stepper\"") && html.contains("id=\"scanner\"") && html.contains("id=\"statusbar\""));
+        let tok = html.split("id=\"page-token\">\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+        let s = wait_status(&page, &tok, "\"step\":\"auth\"").await;
+        assert!(s.contains(node));
+        let (_, o) = http(&page, "GET", "/outcome", Some(&tok), "").await;
+        assert!(o.ends_with("null"));
+        let (c, b) = http(&page, "POST", "/fvk", Some(&tok), &hex::encode(zigner_fvk_binary(&fvk))).await;
+        assert_eq!(c, 200, "{b}");
+        let s = wait_status(&page, &tok, "\"step\":\"action\"").await;
+        assert!(!s.contains("penumbrafullviewingkey"), "status must not leak FVK");
+        let home = s.split("\"home\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+        let db = std::path::Path::new(&home).join(session::VIEW_FILE);
+        if round == 0 {
+            assert!(s.contains("\"view_db\":\"new "), "{s}");
+            assert!(!db.exists());
+            std::fs::write(&db, b"synced-height-42").unwrap();
+        } else {
+            assert!(s.contains("\"view_db\":\"resumed "), "{s}");
+            assert_eq!(std::fs::read(&db).unwrap(), b"synced-height-42");
+        }
+        assert_eq!(http(&page, "POST", "/end", Some(&tok), "").await.0, 200);
+        r.done.await.unwrap().unwrap();
+        assert!(!std::path::Path::new(&home).exists(), "home wiped");
+        assert_eq!(std::fs::read(&cache_file).unwrap(), b"synced-height-42", "view DB kept");
+    }
+    let _ = std::fs::remove_dir_all(&root);
+}
