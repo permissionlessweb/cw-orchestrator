@@ -23,6 +23,8 @@ mod tx_extension;
 mod wire;
 #[cfg(test)]
 mod zigner_e2e;
+#[cfg(test)]
+mod feegrant_e2e;
 
 pub use ephemeral::ensure_ephemeral_mnemonic;
 pub use port::{page_addr, PORT_ENV, PORT_RANGE};
