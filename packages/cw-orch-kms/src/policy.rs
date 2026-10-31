@@ -4,6 +4,8 @@
 use rand::RngCore;
 
 pub const MAX_SESSION_TTL_SECS: u64 = 86_400;
+/// An operator grant covers the study, not one sitting. Thirty days.
+pub const MAX_OPERATOR_GRANT_TTL_SECS: u64 = 30 * 86_400;
 pub const MAX_CALLS_PER_CONTRACT: u64 = 1_000;
 pub const MAX_CHALLENGE_TTL_SECS: u64 = 900;
 pub const GRANTER_CHALLENGE_PREFIX: &str = "cw-orch-granter:v2";
@@ -40,11 +42,19 @@ pub fn refuse_forbidden(type_url: &str) -> Result<(), String> {
 }
 
 pub fn validate_ttl(ttl_secs: u64) -> Result<(), String> {
+    validate_ttl_max(ttl_secs, MAX_SESSION_TTL_SECS, "session")
+}
+
+pub fn validate_operator_grant_ttl(ttl_secs: u64) -> Result<(), String> {
+    validate_ttl_max(ttl_secs, MAX_OPERATOR_GRANT_TTL_SECS, "operator grant")
+}
+
+fn validate_ttl_max(ttl_secs: u64, max: u64, kind: &str) -> Result<(), String> {
     if ttl_secs == 0 {
-        return Err("session ttl must be > 0".into());
+        return Err(format!("{kind} ttl must be > 0"));
     }
-    if ttl_secs > MAX_SESSION_TTL_SECS {
-        return Err(format!("session ttl {ttl_secs}s exceeds max {MAX_SESSION_TTL_SECS}s"));
+    if ttl_secs > max {
+        return Err(format!("{kind} ttl {ttl_secs}s exceeds max {max}s"));
     }
     Ok(())
 }

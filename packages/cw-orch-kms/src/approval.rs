@@ -75,6 +75,8 @@ pub struct ApprovalSession {
     pub retain: bool,
     /// Grant `MsgExec` (nested authz). See [`ApprovalSession::allow_nested_exec`].
     pub nested_exec: bool,
+    /// This grant is held by an operator wallet, not burned at the end of one run.
+    pub operator_grant: bool,
 }
 
 impl ApprovalSession {
@@ -193,6 +195,7 @@ impl ApprovalSession {
             account_index: 0,
             retain: false,
             nested_exec: false,
+            operator_grant: false,
         }
     }
 }
@@ -475,7 +478,12 @@ pub fn grant_to(
     if session.granter.is_empty() {
         return Err("grant refused: empty granter".into());
     }
-    crate::policy::validate_ttl(session.ttl_secs).map_err(|e| format!("grant refused: {e}"))?;
+    if session.operator_grant {
+        crate::policy::validate_operator_grant_ttl(session.ttl_secs)
+            .map_err(|e| format!("grant refused: {e}"))?;
+    } else {
+        crate::policy::validate_ttl(session.ttl_secs).map_err(|e| format!("grant refused: {e}"))?;
+    }
     if session.type_urls.is_empty() {
         return Err("grant refused: no message types".into());
     }
