@@ -57,7 +57,7 @@ pub use session::{ApprovalFactor, Clock, FrostSession, ScriptSession, SessionGra
 pub use terminal::zigner_qr_hex;
 pub use ui_shared::{raptor_frames, zigner_frames, ZIGNER_FRAME_BYTES};
 pub use terminal::{
-    approval_chain_id, capture_granter, capture_granter_for_chain_sync, capture_granter_sync, listen,
+    approval_chain_id, capture_granter, capture_granter_for_chain_opts_sync, capture_granter_for_chain_sync, capture_granter_sync, listen,
     set_approval_chain_id, ApprovalView, Approver, Terminal,
     TerminalOutcome, TestApprover,
 };
