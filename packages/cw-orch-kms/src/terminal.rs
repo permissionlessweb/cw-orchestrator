@@ -234,7 +234,32 @@ pub fn capture_granter_sync(
         .enable_all()
         .build()
         .map_err(|err| format!("granter refused: {err}"))?;
-    let result = runtime.block_on(capture_granter_bound(addr, account_index, binding));
+    capture_granter_deadline_sync_rt(runtime, addr, account_index, binding, None, None)
+}
+
+fn capture_granter_deadline_sync(
+    addr: SocketAddr,
+    account_index: u32,
+    binding: &str,
+    expected: Option<&str>,
+    expires_unix: Option<u64>,
+) -> Result<String, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| format!("granter refused: {err}"))?;
+    capture_granter_deadline_sync_rt(runtime, addr, account_index, binding, expected, expires_unix)
+}
+
+fn capture_granter_deadline_sync_rt(
+    runtime: tokio::runtime::Runtime,
+    addr: SocketAddr,
+    account_index: u32,
+    binding: &str,
+    expected: Option<&str>,
+    expires_unix: Option<u64>,
+) -> Result<String, String> {
+    let result = runtime.block_on(capture_granter_bound(addr, account_index, binding, expected, expires_unix));
     // The runtime (and with it the page listener) is gone now; keep the port
     // answering until the session page binds it, so the tab auto-advances.
     drop(runtime);
@@ -245,10 +270,21 @@ pub fn capture_granter_sync(
         }
         Err(err) => {
             crate::progress::update_detail(GRANTER_STEP, crate::progress::Status::Error, None, Some(&err));
+            // Leave the error on the tab's port for a few polls before the process exits.
+            // Only on the deadline path (the binary), so the plain capture used by
+            // library callers and tests never touches the shared standby.
+            if let (Some(_), Some(port)) = (expires_unix, crate::port::pinned_page_port()) {
+                crate::progress::start_standby(port);
+                std::thread::sleep(std::time::Duration::from_millis(EXIT_NOTICE_MS));
+                crate::progress::stop_standby();
+            }
             Err(err)
         }
     }
 }
+
+/// How long a failed challenge keeps its error on the page before returning.
+pub const EXIT_NOTICE_MS: u64 = 3_000;
 
 /// Progress label of the granter challenge step.
 pub const GRANTER_STEP: &str = "granter challenge";
@@ -259,7 +295,7 @@ pub async fn capture_granter(
     account_index: u32,
     binding: &str,
 ) -> Result<String, String> {
-    capture_granter_bound(addr, account_index, binding).await.map(|(signer, _)| signer)
+    capture_granter_bound(addr, account_index, binding, None, None).await.map(|(signer, _)| signer)
 }
 
 /// [`capture_granter`] plus the port the page used. That port becomes the
@@ -268,6 +304,8 @@ async fn capture_granter_bound(
     addr: SocketAddr,
     account_index: u32,
     binding: &str,
+    expected: Option<&str>,
+    expires_unix: Option<u64>,
 ) -> Result<(String, u16), String> {
     if crate::progress::steps().is_empty() {
         crate::progress::plan(&crate::progress::DEFAULT_PLAN);
@@ -280,10 +318,24 @@ async fn capture_granter_bound(
     let messages = vec![SigningRequest::new("cw-orch-granter:v1").body(format!(
         "the key that signs {binding} is the granter"
     ))];
-    let mut terminal = listen_sign_doc(addr, "key", doc, messages, account_index).await?;
+    let mut terminal = listen_sign_doc(addr, expected.unwrap_or("key"), doc, messages, account_index).await?;
     let port = terminal.addr().port();
     crate::port::pin_page_port(port);
-    let outcome = terminal.outcome().await?;
+    let outcome = match expires_unix {
+        None => terminal.outcome().await?,
+        Some(exp) => {
+            let left = exp.saturating_sub(crate::policy::now_unix());
+            match tokio::time::timeout(std::time::Duration::from_secs(left), terminal.outcome()).await {
+                Ok(outcome) => outcome?,
+                Err(_) => {
+                    drop(terminal);
+                    return Err(format!(
+                        "granter refused: challenge expired before signing (expiry unix {exp}); rerun this batch for a fresh challenge"
+                    ));
+                }
+            }
+        }
+    };
     drop(terminal);
     match outcome {
         TerminalOutcome::Signed { signer, .. } => {
@@ -760,7 +812,16 @@ const PAGE_SCRIPT: &str = r#"<script>
     }
     result.textContent = text;
     logLine(kindFor(text), text);
-    if (!bundles) return;
+    if (!bundles) {
+      if (text.indexOf("valid ") === 0) { stopScan(); scanStatus.textContent = "challenge accepted. this tab moves to the next step by itself"; return; }
+      if (text.indexOf("invalid") === 0 || text.indexOf("refused") === 0) {
+        // Re-arm: the refused code is spent, a new scan may follow.
+        mode = ""; urParts = []; urSeen = {}; urType = ""; pFrames = {}; pTotal = 0; framesThisScan = [];
+        finished = false;
+        scanStatus.textContent = "not accepted: " + text + ". scan again";
+      }
+      return;
+    }
     var accepted = text.indexOf("valid ") === 0 || text.indexOf("authorized ") === 0 || text.indexOf("session-ready ") === 0;
     if (!accepted) return;
     signedAt[shown] = true;
@@ -943,8 +1004,16 @@ const PAGE_SCRIPT: &str = r#"<script>
     }
     var match = /^P(\d+)\/(\d+)\/([^/]+)\/(.+)$/.exec(text);
     if (!match) {
-      if (/^[0-9a-fA-F]{128}$/.test(text.trim())) {
-        if (!finished && open) { finished = true; scanStatus.textContent = "bare signature received, recovering pubkey"; ws.send("sigonly " + text.trim()); }
+      var hexText = String(text || "").trim().replace(/^0x/i, "");
+      if (/^[0-9a-fA-F]{128}$/.test(hexText) || /^[0-9a-fA-F]{130}$/.test(hexText)) {
+        // bare r||s (64 bytes), or r||s||v (65 bytes, v dropped: the server tries every recovery id)
+        if (!finished && open) { finished = true; framesThisScan = []; scanStatus.textContent = "bare signature received, recovering pubkey"; ws.send("sigonly " + hexText.slice(0, 128)); }
+      } else if (/^[0-9a-fA-F]{194}$/.test(hexText)) {
+        acceptBytes(hexToBytes(hexText)); // 33-byte pubkey + 64-byte signature envelope
+      } else if (text && text.length === 97) {
+        var raw = new Uint8Array(97);
+        for (var q = 0; q < 97; q++) raw[q] = text.charCodeAt(q) & 0xff;
+        acceptBytes(raw); // binary-mode QR carrying the envelope
       }
       return;
     }
@@ -1247,7 +1316,16 @@ async fn handle(mut socket: WebSocket, state: Arc<AppState>) {
         let text = match text.trim().strip_prefix("sigonly ") {
             Some(sig_hex) => match recover_check(state.sign_doc.as_deref(), &state.principal, sig_hex) {
                 Some(rewritten) => { println!("sigonly: recovered pubkey for {}", state.principal); rewritten }
-                None => { let _ = socket.send(Message::Text("invalid: bare signature does not recover to the expected sender".to_string().into())).await; continue; }
+                None => {
+                    let why = if state.principal == "key" {
+                        "invalid: a bare signature has no pubkey and this page has no expected granter to recover against. scan the pubkey+signature code, or rerun with the granter address"
+                    } else {
+                        "invalid: bare signature does not recover to the expected sender"
+                    };
+                    println!("sigonly: {why}");
+                    let _ = socket.send(Message::Text(why.to_string().into())).await;
+                    continue;
+                }
             },
             None => text,
         };
@@ -2292,14 +2370,50 @@ pub fn capture_granter_for_chain_sync(
     purpose: &str,
     chain_id: &str,
 ) -> Result<String, String> {
-    set_approval_chain_id(chain_id)?;
-    let challenge = crate::policy::GranterChallenge::new(
+    capture_granter_for_chain_opts_sync(
+        addr,
+        account_index,
         purpose,
         chain_id,
-        crate::policy::MAX_CHALLENGE_TTL_SECS,
-        crate::policy::now_unix(),
+        crate::policy::DEFAULT_CHALLENGE_TTL_SECS,
+        None,
+    )
+}
+
+/// [`capture_granter_for_chain_sync`] with an explicit challenge TTL (clamped to
+/// `1..=MAX_CHALLENGE_TTL_SECS`) and an optional expected granter address.
+///
+/// With `expected` set, the page knows whose key must sign, so a bare 64-byte
+/// Zigner signature (no pubkey) can be recovered and matched; without it only
+/// pubkey+signature envelopes work. The page stops at the challenge expiry
+/// and the call returns promptly with an "expired" error.
+pub fn capture_granter_for_chain_opts_sync(
+    addr: SocketAddr,
+    account_index: u32,
+    purpose: &str,
+    chain_id: &str,
+    ttl_secs: u64,
+    expected: Option<&str>,
+) -> Result<String, String> {
+    set_approval_chain_id(chain_id)?;
+    let ttl = ttl_secs.clamp(1, crate::policy::MAX_CHALLENGE_TTL_SECS);
+    let challenge = crate::policy::GranterChallenge::new(purpose, chain_id, ttl, crate::policy::now_unix())?;
+    let expected = expected.map(str::trim).filter(|e| !e.is_empty());
+    if let Some(e) = expected {
+        crate::policy::validate_chain_address(e).map_err(|err| format!("granter refused: {err}"))?;
+    }
+    println!(
+        "granter challenge expires at unix {} ({} min from now)",
+        challenge.expires_unix,
+        ttl / 60
+    );
+    let signer = capture_granter_deadline_sync(
+        addr,
+        account_index,
+        &challenge.binding(),
+        expected,
+        Some(challenge.expires_unix),
     )?;
-    let signer = capture_granter_sync(addr, account_index, &challenge.binding())?;
     if crate::policy::now_unix() >= challenge.expires_unix {
         return Err("granter refused: challenge expired before signing".into());
     }

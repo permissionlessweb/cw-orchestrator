@@ -257,7 +257,7 @@ static STANDBY: Mutex<Option<Standby>> = Mutex::new(None);
 const STANDBY_HTML: &str = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>cw-orch run</title>\
 <style>body{background:#0D0D12;color:#E0E0E4;font:15px system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px}.ok{color:#50C878}.err{color:#C05050}.wait{color:#F4A31E}code{word-break:break-all}</style></head>\
 <body><p>ZAFU · SESSION</p><h1>Waiting for the next step</h1><p>This tab follows the run and opens the next step by itself. Keep it open.</p>\
-<div id=\"run-progress\"></div><script>";
+<div id=\"run-progress\"></div>";
 
 /// Keep `/` and `/state` answering on `port` until the next page binds it.
 /// Runs on its own thread so it outlives the runtime that served the last page.
@@ -288,7 +288,7 @@ pub(crate) fn start_standby(port: u16) {
                 return;
             };
             let state_instance = instance.clone();
-            let html = format!("{STANDBY_HTML}{}cwOrchFollow({});</script></body></html>", crate::ui_shared::FOLLOW_SCRIPT, esc(&instance));
+            let html = format!("{STANDBY_HTML}{}<script>cwOrchFollow({});</script></body></html>", crate::ui_shared::FOLLOW_SCRIPT, esc(&instance));
             let app = axum::Router::new()
                 .route("/", axum::routing::get(move || {
                     let html = html.clone();
@@ -468,7 +468,7 @@ mod tests {
             assert_eq!(status(&standby, "granter challenge"), "signed");
             assert_eq!(standby["step"], 2);
             let (_, html) = get(addr, "/").await.unwrap();
-            assert!(html.contains("cwOrchFollow("));
+            assert!(html.contains("<script>cwOrchFollow(") && !html.contains("<script><script>"), "standby runs its follow script");
 
             // 3. Session authorization page binds the same port (standby released).
             let auth_doc = format!("authorize batch {batch}").into_bytes();

@@ -77,6 +77,11 @@ pub fn page_addr() -> SocketAddr {
 /// Make `port` this process's page port, so every later page (the session
 /// authorization after the granter challenge, the next batch) opens on the port
 /// the operator's tab and ssh tunnel already use. `CW_ORCH_KMS_PORT` still wins.
+/// The port pinned by [`pin_page_port`], if any.
+pub fn pinned_page_port() -> Option<u16> {
+    *PINNED.lock().unwrap_or_else(|p| p.into_inner())
+}
+
 pub fn pin_page_port(port: u16) {
     if port == 0 {
         return;

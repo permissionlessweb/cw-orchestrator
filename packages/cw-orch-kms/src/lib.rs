@@ -25,6 +25,8 @@ mod wire;
 #[cfg(test)]
 mod zigner_e2e;
 #[cfg(test)]
+mod zigner_replay;
+#[cfg(test)]
 mod feegrant_e2e;
 
 pub use ephemeral::ensure_ephemeral_mnemonic;

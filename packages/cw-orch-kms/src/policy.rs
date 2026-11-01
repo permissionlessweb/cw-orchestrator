@@ -7,7 +7,9 @@ pub const MAX_SESSION_TTL_SECS: u64 = 86_400;
 /// An operator grant covers the study, not one sitting. Thirty days.
 pub const MAX_OPERATOR_GRANT_TTL_SECS: u64 = 30 * 86_400;
 pub const MAX_CALLS_PER_CONTRACT: u64 = 1_000;
-pub const MAX_CHALLENGE_TTL_SECS: u64 = 900;
+pub const MAX_CHALLENGE_TTL_SECS: u64 = 30 * 60;
+/// Granter challenge lifetime when the caller does not pass one (matches the 30 min session default).
+pub const DEFAULT_CHALLENGE_TTL_SECS: u64 = 30 * 60;
 pub const GRANTER_CHALLENGE_PREFIX: &str = "cw-orch-granter:v2";
 
 /// Message types a scripted session must never be granted.

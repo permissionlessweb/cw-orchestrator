@@ -341,7 +341,7 @@ pub(crate) fn hex_encode(bytes: &[u8]) -> String {
 /// new step. A failed poll (no server between phases) only shows "waiting".
 pub(crate) const FOLLOW_SCRIPT: &str = r#"<script>
 (function () {
-  var mine = null, timer = null, busy = false, last = "";
+  var mine = null, timer = null, busy = false, last = "", lastErr = null;
   function box() {
     var el = document.getElementById("run-progress");
     if (!el) {
@@ -360,7 +360,9 @@ pub(crate) const FOLLOW_SCRIPT: &str = r#"<script>
   }
   function render(s) {
     var head;
-    if (!s) {
+    if (!s && lastErr) {
+      head = "<p class=\"err\" id=\"run-head\">stopped: " + esc(lastErr) + " · the script has exited</p>";
+    } else if (!s) {
       head = "<p class=\"wait\" id=\"run-head\">waiting for the next step (the run is between pages). this tab opens it by itself</p>";
     } else {
       var cur = s.steps[s.step - 1];
@@ -383,6 +385,7 @@ pub(crate) const FOLLOW_SCRIPT: &str = r#"<script>
     fetch("/state", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
       busy = false;
       if (s && mine && s.instance !== mine) { location.reload(); return; }
+      if (s && s.error) { var ce = s.steps[s.step - 1]; lastErr = (ce && (ce.label + ": " + (ce.detail || ce.status))) || "error"; } else if (s) lastErr = null;
       render(s);
     }).catch(function () { busy = false; render(null); });
   }
