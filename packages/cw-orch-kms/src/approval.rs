@@ -1344,7 +1344,7 @@ mod tests {
         let key = k256::ecdsa::SigningKey::from_slice(&[1u8; 32]).unwrap();
         let pubkey = key
             .verifying_key()
-            .to_encoded_point(true)
+            .to_sec1_point(true)
             .as_bytes()
             .to_vec();
         let raw = legacy_amino_raw(

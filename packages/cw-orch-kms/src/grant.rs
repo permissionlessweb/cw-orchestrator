@@ -725,8 +725,10 @@ fn encode_revoke_allowance(granter: &str, grantee: &str) -> Result<(String, Vec<
     Ok((amino, bytes))
 }
 
-fn proto_any(type_url: &str, value: Vec<u8>) -> tendermint_proto::google::protobuf::Any {
-    tendermint_proto::google::protobuf::Any {
+fn proto_any(type_url: &str, value: Vec<u8>) -> cosmrs::Any {
+    // cosmrs::Any is the tendermint-proto copy cosmos-sdk-proto was built
+    // against. The workspace path copy is a different crate.
+    cosmrs::Any {
         type_url: type_url.to_string(),
         value,
     }

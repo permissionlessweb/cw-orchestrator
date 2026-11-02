@@ -1736,12 +1736,13 @@ fn recover_check(sign_doc: Option<&[u8]>, principal: &str, sig_hex: &str) -> Opt
     let doc = sign_doc?;
     let raw: Vec<u8> = (0..sig_hex.len()).step_by(2).map(|i| u8::from_str_radix(sig_hex.get(i..i + 2)?, 16).ok()).collect::<Option<_>>()?;
     let sig = k256::ecdsa::Signature::from_slice(&raw).ok()?;
-    let sig = sig.normalize_s().unwrap_or(sig);
+    // ecdsa 0.17 returns the low-s signature directly.
+    let sig = sig.normalize_s();
     let hash = sha2::Sha256::digest(doc);
     for id in 0u8..4 {
         let Some(rid) = k256::ecdsa::RecoveryId::from_byte(id) else { continue };
         if let Ok(vk) = k256::ecdsa::VerifyingKey::recover_from_prehash(&hash, &sig, rid) {
-            let pk = vk.to_encoded_point(true).as_bytes().to_vec();
+            let pk = vk.to_sec1_point(true).as_bytes().to_vec();
             if address_matches(principal, &pk) {
                 let b = base64::engine::general_purpose::STANDARD;
                 return Some(format!("check {} {}", b.encode(&pk), b.encode(sig.to_bytes())));
@@ -1759,7 +1760,7 @@ fn verify_amino(pk: &[u8], sig_bytes: &[u8], message: &[u8]) -> bool {
     let Ok(sig) = k256::ecdsa::Signature::from_slice(sig_bytes) else {
         return false;
     };
-    let sig = sig.normalize_s().unwrap_or(sig);
+    let sig = sig.normalize_s();
     let hash = sha2::Sha256::digest(message);
     vk.verify_prehash(&hash, &sig).is_ok()
 }
@@ -2175,7 +2176,7 @@ mod tests {
     fn zafu_line(digest: &str, principal: &str, approval: &str, flip: bool) -> String {
         use k256::ecdsa::signature::hazmat::PrehashSigner;
         let sk = k256::ecdsa::SigningKey::from_slice(&[7u8; 32]).unwrap();
-        let pk = sk.verifying_key().to_encoded_point(true);
+        let pk = sk.verifying_key().to_sec1_point(true);
         set_approval_chain_id("morocco-1").unwrap();
         let message = approval_sign_bytes(
             "morocco-1",
@@ -2296,7 +2297,7 @@ mod tests {
     fn sign_doc(message: &[u8]) -> (String, String, String) {
         use k256::ecdsa::signature::hazmat::PrehashSigner;
         let sk = k256::ecdsa::SigningKey::from_slice(&[7u8; 32]).unwrap();
-        let pk = sk.verifying_key().to_encoded_point(true);
+        let pk = sk.verifying_key().to_sec1_point(true);
         let hash = sha2::Sha256::digest(message);
         let sig: k256::ecdsa::Signature = sk.sign_prehash(&hash).unwrap();
         let addr = bech32::encode::<bech32::Bech32>(
