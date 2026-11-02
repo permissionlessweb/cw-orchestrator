@@ -37,7 +37,7 @@ impl ThrowawayKey {
         }
     }
     pub(crate) fn pubkey(&self) -> Vec<u8> {
-        self.sk.verifying_key().to_encoded_point(true).as_bytes().to_vec()
+        self.sk.verifying_key().to_sec1_point(true).as_bytes().to_vec()
     }
     pub(crate) fn address(&self) -> String {
         let hash = ripemd::Ripemd160::digest(sha2::Sha256::digest(self.pubkey()));
@@ -47,7 +47,7 @@ impl ThrowawayKey {
     pub(crate) fn zigner_sign(&self, doc: &[u8]) -> Vec<u8> {
         let hash = sha2::Sha256::digest(doc);
         let sig: k256::ecdsa::Signature = self.sk.sign_prehash(&hash).unwrap();
-        sig.normalize_s().unwrap_or(sig).to_bytes().to_vec()
+        sig.normalize_s().to_bytes().to_vec()
     }
     pub(crate) fn secret_hex(&self) -> String {
         hex(&self.sk.to_bytes())

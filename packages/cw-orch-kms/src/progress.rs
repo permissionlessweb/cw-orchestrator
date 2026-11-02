@@ -356,7 +356,7 @@ mod tests {
     fn signed(message: &[u8]) -> (String, String, String) {
         use k256::ecdsa::signature::hazmat::PrehashSigner;
         let sk = k256::ecdsa::SigningKey::from_slice(&[7u8; 32]).unwrap();
-        let pk = sk.verifying_key().to_encoded_point(true);
+        let pk = sk.verifying_key().to_sec1_point(true);
         let sig: k256::ecdsa::Signature = sk.sign_prehash(&sha2::Sha256::digest(message)).unwrap();
         let addr = bech32::encode::<bech32::Bech32>(
             bech32::Hrp::parse("terp").unwrap(),
