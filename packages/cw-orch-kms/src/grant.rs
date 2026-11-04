@@ -389,6 +389,44 @@ pub fn revoke_exec_anys(
     Ok(anys)
 }
 
+/// [`revoke_exec_anys`] limited to what the chain still stores. A revoke of a
+/// grant that was never created (or already expired) fails the whole batch,
+/// so each revoke is kept only when `live` has that grant or allowance. The
+/// self-grant revoke (`MsgRevoke`) always goes last.
+pub fn revoke_exec_anys_live(
+    granter: &str,
+    grantee: &str,
+    type_urls: &[String],
+    live: &GranteeState,
+) -> Result<Vec<cosmrs::Any>, String> {
+    let has = |url: &str| live.authz.iter().any(|a| a.type_url == url);
+    let mut urls: Vec<&str> = type_urls
+        .iter()
+        .map(String::as_str)
+        .filter(|url| *url != REVOKE_AUTHZ && *url != REVOKE_ALLOWANCE && has(url))
+        .collect();
+    urls.sort();
+    urls.dedup();
+    let mut anys = Vec::new();
+    for url in urls {
+        let (_, bytes) = encode_revoke(granter, grantee, url)?;
+        anys.push(cosmrs::Any { type_url: REVOKE_AUTHZ.to_string(), value: bytes });
+    }
+    if live.feegrant.is_some() {
+        let (_, allowance) = encode_revoke_allowance(granter, grantee)?;
+        anys.push(cosmrs::Any { type_url: REVOKE_ALLOWANCE.to_string(), value: allowance });
+    }
+    if has(REVOKE_ALLOWANCE) {
+        let (_, fee_grant) = encode_revoke(granter, grantee, REVOKE_ALLOWANCE)?;
+        anys.push(cosmrs::Any { type_url: REVOKE_AUTHZ.to_string(), value: fee_grant });
+    }
+    if has(REVOKE_AUTHZ) {
+        let (_, self_grant) = encode_revoke(granter, grantee, REVOKE_AUTHZ)?;
+        anys.push(cosmrs::Any { type_url: REVOKE_AUTHZ.to_string(), value: self_grant });
+    }
+    Ok(anys)
+}
+
 #[allow(dead_code)]
 pub fn build_revoke_tx(
     granter: &str,

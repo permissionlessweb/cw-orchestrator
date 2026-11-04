@@ -28,7 +28,7 @@ use crate::allowlist::{
     RunAllowlist, ScopedCall, SigningRequest, MSG_INSTANTIATE, MSG_STORE_CODE,
 };
 use crate::grant::{
-    pack_qr_batches, plan_session_setup, plan_session_setup_with, revoke_exec_anys, GranteeState,
+    pack_qr_batches, plan_session_setup, plan_session_setup_with, revoke_exec_anys, revoke_exec_anys_live, GranteeState,
     LiveAuthz, LiveFeegrant, SetupChain, SetupTx, REVOKE_ALLOWANCE, REVOKE_AUTHZ,
 };
 use crate::session::{ApprovalFactor, Clock, SessionGrant};
@@ -46,6 +46,7 @@ impl Clock for SystemClock {
 }
 
 /// What `enable_approval` asks the cold key to allow.
+#[derive(Clone)]
 pub struct ApprovalSession {
     /// Cold bech32 address that signs the grant.
     pub granter: String,
@@ -314,7 +315,19 @@ impl AuthzSession {
             println!("session grant retained");
             return Ok(());
         }
-        let msgs = revoke_exec_anys(&self.granter, &self.grantee, &self.type_urls)?;
+        // Revoke only what the chain still stores: one never-created grant fails the whole batch.
+        let msgs = match self.remaining_grants() {
+            Ok(live) => revoke_exec_anys_live(&self.granter, &self.grantee, &self.type_urls, &live)?,
+            Err(err) => {
+                println!("session revoke: grant query failed ({err}); revoking the full planned set");
+                revoke_exec_anys(&self.granter, &self.grantee, &self.type_urls)?
+            }
+        };
+        if msgs.is_empty() {
+            update_detail(REVOKE_STEP, Status::Confirmed, None, Some("nothing left to revoke"));
+            println!("session revoke: nothing left on chain");
+            return Ok(());
+        }
         update(REVOKE_STEP, Status::Running, None);
         let handle = self.daemon.rt_handle.clone();
         let sender = self.daemon.sender();
