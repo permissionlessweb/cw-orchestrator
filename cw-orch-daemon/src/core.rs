@@ -478,20 +478,58 @@ pub async fn upload_circuit<T: TxSender>(
     access: Option<AccessConfig>,
 ) -> Result<CosmTxResponse, DaemonError> {
     let file_contents = std::fs::read(wasm_path.path())?;
-    let mut e = write::GzEncoder::new(Vec::new(), Compression::default());
-    e.write_all(&file_contents)?;
+    let (params_body, vk_body, auth) = split_store_circuit_blob(&file_contents)?;
 
-    let store_msg = cosmrs::cosmwasm::MsgStoreCircuit {
+    let store_msg = cosmrs::cosmwasm::MsgStoreFullCircuit {
         sender: sender.msg_sender().map_err(Into::into)?,
-        circuit_binary: file_contents,
-        instantiate_permission: access.map(access_config_to_cosmrs).transpose()?,
+        auth,
+        params_body,
+        vk_body,
     };
+    let _ = access; // store-full-circuit has no instantiate permission field
 
     sender
         .commit_tx(vec![store_msg], None)
         .await
         .map_err(Into::into)
 }
+
+/// Split a combined store-circuit blob `[params][cs][vk][CircuitFooter]`
+/// into the params file + vk-body the chain MsgStoreFullCircuit expects.
+fn split_store_circuit_blob(
+    blob: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>, cosmrs::cosmwasm::CircuitParamAuth), DaemonError> {
+    const FOOTER_LEN: usize = 80;
+    if blob.len() < FOOTER_LEN {
+        return Err(DaemonError::StdErr(
+            "store-circuit blob shorter than CircuitFooter".into(),
+        ));
+    }
+    let footer = &blob[blob.len() - FOOTER_LEN..];
+    let param_len = u32::from_le_bytes(footer[4..8].try_into().unwrap()) as usize;
+    let cs_len = u32::from_le_bytes(footer[8..12].try_into().unwrap()) as usize;
+    let vk_len = u32::from_le_bytes(footer[12..16].try_into().unwrap()) as usize;
+    let expect = param_len + cs_len + vk_len + FOOTER_LEN;
+    if blob.len() != expect {
+        return Err(DaemonError::StdErr(format!(
+            "store-circuit blob len {} != param+cs+vk+footer {}",
+            blob.len(),
+            expect
+        )));
+    }
+    let params_body = blob[..param_len].to_vec();
+    let vk_body = blob[param_len..].to_vec();
+    let auth = cosmrs::cosmwasm::CircuitParamAuth {
+        circuit_type: footer[0] as u64,
+        curve_type: footer[1] as u64,
+        k: footer[2] as u64,
+    };
+    if auth.k == 0 {
+        return Err(DaemonError::StdErr("footer k must be non-zero".into()));
+    }
+    Ok((params_body, vk_body, auth))
+}
+
 
 pub(crate) fn access_config_to_cosmrs(
     access_config: AccessConfig,

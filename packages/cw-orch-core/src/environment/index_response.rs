@@ -72,22 +72,25 @@ pub trait IndexResponse {
     }
     /// Shortcut to get the code id of a contract of an upload response.
     fn uploaded_zk_id(&self) -> StdResult<u64> {
-        if let Ok(zk_id) = self
-            .event_attr_value(ZK_ID_UPLOAD_EVENT.0, ZK_ID_UPLOAD_EVENT.1)
-            .map(|s| s.parse().unwrap())
-        {
-            Ok(zk_id)
-        } else {
-            // for injective
-            #[cfg(not(feature = "eth"))]
-            panic!("Injective upload event parsing not supported without eth feature");
-            #[cfg(feature = "eth")]
-            self.event_attr_value(
-                INJECTIVE_CODE_ID_UPLOAD_EVENT.0,
-                INJECTIVE_CODE_ID_UPLOAD_EVENT.1,
-            )
-            .map(|s| unescape(&s).unwrap().parse().unwrap())
+        // Terp wasmd emits store_full_circuit/zk_id or store_circuit/zk_id.
+        // The older zkid_id attribute is still tried for compatibility.
+        const CANDIDATES: &[(&str, &str)] = &[
+            ("store_full_circuit", "zk_id"),
+            ("store_circuit", "zk_id"),
+            ("store_circuit", "zkid_id"),
+            ("store_full_circuit", "zkid"),
+            ZK_ID_UPLOAD_EVENT,
+        ];
+        for (ty, key) in CANDIDATES {
+            if let Ok(s) = self.event_attr_value(ty, key) {
+                if let Ok(id) = s.parse::<u64>() {
+                    return Ok(id);
+                }
+            }
         }
+        Err(StdError::msg(
+            "zk_id not found in tx events (looked for store_full_circuit/store_circuit)",
+        ))
     }
 }
 
